@@ -1,0 +1,75 @@
+{%include "header.html" %}
+<body>
+  <div class="container">
+    <div class="content row">
+      <aside class="col-xs-12 col-md-3">
+        <nav>
+          <ul>
+            <li><a href="/dashboard">Home</a></li>
+            <li><a href="/dashboard/users">Users</a></li>
+            <li>
+              <details name="sell">
+                <summary>Users</summary>
+                <ul>
+                  <li>All Users</li>
+                  <li>Roles</li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <details name="sell">
+                <summary>Contacts</summary>
+                <ul>
+                  <li>Suppliers</li>
+                  <li>Customers</li>
+                  <li>Resellers</li>
+                  <li>Reseller</li>
+                </ul>
+              </details>
+            </li>
+            <li><a href="/dashboard/items">Items</a></li>
+            <li>
+              <details name="sell">
+                <summary>Items</summary>
+                <ul>
+                  <li>List Items</li>
+                  <li>Add Item</li>
+                  <li>Import Items</li>
+                  <li>Categories</li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <details name="sell">
+                <summary>Sell</summary>
+                <ul>
+                  <li>All Sales</li>
+                  <li>POS</li>
+                  <li>Events</li>
+                  <li>Reseller</li>
+                </ul>
+              </details>
+            </li>
+            <li><a href="/dashboard/receipts">Receipts</a></li>
+            <li><a href="/dashboard/quotes">Quotes</a></li>
+            <li><a href="/dashboard/invoices">Invoices</a></li>
+            <li><a href="/dashboard/purchases">Purchases</a></li>
+            <li><a href="/dashboard/inventory">Inventory</a></li>
+            <li><a href="/dashboard/reports">Reports</a></li>
+            <li>
+              <form action="/auth/logout" method="post">
+                <button type="submit" class="logout-link">Log out</button>
+              </form>
+            </li>
+          </ul>
+        </nav>
+
+      </aside>
+      <main class="col-xs-12 col-md-9">
+        <h1>Dashboard</h1>
+        <p>Welcome to the dashboard! Here you can manage your customers, suppliers, resellers, and items.</p>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

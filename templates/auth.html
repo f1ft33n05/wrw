@@ -1,0 +1,22 @@
+{%include "header.html" %}
+<body>
+  <div class="container">
+    <div class="content row">
+      <form action="/auth/login" method="post" class="login-form col-xs-12 col-md-5">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required>
+
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+
+        <button type="submit">Log In</button>
+      </form>
+      <div class="spacer col-md-2"></div>
+      <div class="illustration col-xs-12 col-md-5">
+        <img src="{{ url_for('static', path='images/wine-illustration.png') }}" alt="Wine Illustration" class="illustration-image">
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
