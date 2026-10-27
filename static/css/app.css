@@ -72,3 +72,14 @@ details.dropdown>summary+ul {
     list-style: none;
     margin-right: 1rem;
 }
+
+#receipt-logo {
+    width: 30rem;
+    padding: 1rem;
+    margin-bottom: 3rem;
+}
+
+#pos-form-container {
+    width: 60%;
+    margin: auto;
+}

@@ -39,6 +39,7 @@ class Item(Base):
     purchase_price = Column(String)
     selling_price_wholesale = Column(String)
     selling_price_retail = Column(String)
+    wholesale_threshold = Column(String, default="6")
     quantity = Column(String)
     unit = Column(String)
     created_at = Column(String)
@@ -52,6 +53,8 @@ class SalesTxn(Base):
     invoice_id = Column(Integer)
     item_id = Column(Integer)
     quantity = Column(String)
+    unit_price = Column(String)
+    price_type = Column(String)
     total_price = Column(String)
     payment_method = Column(String)
     added_by = Column(Integer)
@@ -132,8 +135,10 @@ class Payments(Base):
     id = Column(Integer, primary_key=True, index=True)
     invoice_id = Column(Integer)
     amount = Column(String)
+    change_amount = Column(String)
     payment_method = Column(String)
     status = Column(String)  # e.g., "pending", "completed", "failed"
+    collected_by = Column(Integer)
     created_at = Column(String)
     updated_at = Column(String)
 

@@ -30,19 +30,47 @@ def get_db():
         
 db_dependency = Annotated[Session, Depends(get_db)]
 
-def ensure_sales_item_column(database_engine: Engine) -> None:
+def ensure_sales_columns(database_engine: Engine) -> None:
     inspector = inspect(database_engine)
     if inspector.has_table("sales_txns"):
         columns = {column["name"] for column in inspector.get_columns("sales_txns")}
-        if "item_id" not in columns:
+        missing_columns = {
+            "item_id": "INTEGER",
+            "unit_price": "VARCHAR",
+            "price_type": "VARCHAR",
+        }
+        with database_engine.begin() as connection:
+            for name, column_type in missing_columns.items():
+                if name not in columns:
+                    connection.execute(
+                        text(f"ALTER TABLE sales_txns ADD COLUMN {name} {column_type}")
+                    )
+    if inspector.has_table("payments"):
+        columns = {column["name"] for column in inspector.get_columns("payments")}
+        missing_columns = {
+            "collected_by": "INTEGER",
+            "change_amount": "VARCHAR",
+        }
+        with database_engine.begin() as connection:
+            for name, column_type in missing_columns.items():
+                if name not in columns:
+                    connection.execute(
+                        text(f"ALTER TABLE payments ADD COLUMN {name} {column_type}")
+                    )
+    if inspector.has_table("items"):
+        columns = {column["name"] for column in inspector.get_columns("items")}
+        if "wholesale_threshold" not in columns:
             with database_engine.begin() as connection:
                 connection.execute(
-                    text("ALTER TABLE sales_txns ADD COLUMN item_id INTEGER")
+                    text(
+                        "ALTER TABLE items ADD COLUMN wholesale_threshold "
+                        "VARCHAR NOT NULL DEFAULT '6'"
+                    )
                 )
 
 
 def init_db():
-    ensure_sales_item_column(engine)
+    ensure_sales_columns(engine)
     db = session()
     count = db.query(database_models.User).count()
     if count == 0:

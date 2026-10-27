@@ -43,6 +43,7 @@ async def list_items(db: db_dependency):
             purchase_price=item.purchase_price,
             selling_price_wholesale=item.selling_price_wholesale,
             selling_price_retail=item.selling_price_retail,
+            wholesale_threshold=item.wholesale_threshold or "6",
             quantity=item.quantity,
             unit=item.unit,
             created_at=serialize_timestamp(item.created_at),
@@ -64,6 +65,7 @@ async def create_item(db: db_dependency, create_item_request: CreateItemRequest)
         purchase_price=create_item_request.purchase_price,
         selling_price_wholesale=create_item_request.selling_price_wholesale,
         selling_price_retail=create_item_request.selling_price_retail,
+        wholesale_threshold=str(create_item_request.wholesale_threshold),
         quantity=create_item_request.quantity,
         unit=create_item_request.unit,
         created_at=datetime.now(timezone.utc),
@@ -90,6 +92,7 @@ async def get_item(item_id: int, db: db_dependency):
         purchase_price=item.purchase_price,
         selling_price_wholesale=item.selling_price_wholesale,
         selling_price_retail=item.selling_price_retail,
+        wholesale_threshold=item.wholesale_threshold or "6",
         quantity=item.quantity,
         unit=item.unit,
         created_at=serialize_timestamp(item.created_at),
@@ -112,6 +115,7 @@ async def update_item(item_id: int, update_item_request: CreateItemRequest, db: 
     item.purchase_price = update_item_request.purchase_price
     item.selling_price_wholesale = update_item_request.selling_price_wholesale
     item.selling_price_retail = update_item_request.selling_price_retail
+    item.wholesale_threshold = str(update_item_request.wholesale_threshold)
     item.quantity = update_item_request.quantity
     item.unit = update_item_request.unit
     item.updated_at = datetime.now(timezone.utc)

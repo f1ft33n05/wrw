@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 from enum import Enum
+from decimal import Decimal
+from pydantic import Field, field_validator
 
 class Role(str, Enum):
     admin = "admin"
@@ -69,20 +71,87 @@ class CreateItemRequest(BaseModel):
     purchase_price: float
     selling_price_wholesale: float
     selling_price_retail: float
+    wholesale_threshold: Decimal = Field(default=Decimal("6"), gt=0)
     quantity: float
     unit: str
     created_at: str | None = None
     updated_at: str | None = None
 
-class CreateSaleRequest(BaseModel):
-    id: int | None = None
-    customer_id: int
-    invoice_id: int
+    @field_validator("wholesale_threshold")
+    @classmethod
+    def wholesale_threshold_must_be_finite(cls, value: Decimal) -> Decimal:
+        if not value.is_finite():
+            raise ValueError("Wholesale threshold must be finite")
+        return value
+
+
+class SaleLineRequest(BaseModel):
     item_id: int
-    quantity: float
-    total_price: float
-    payment_method: str
+    quantity: Decimal = Field(gt=0)
+
+    @field_validator("quantity")
+    @classmethod
+    def quantity_must_be_finite(cls, value: Decimal) -> Decimal:
+        if not value.is_finite():
+            raise ValueError("Quantity must be finite")
+        return value
+
+
+class CheckoutRequest(BaseModel):
+    customer_id: int | None = None
+    location: str = "store"
+    items: list[SaleLineRequest] = Field(min_length=1)
+    amount_paid: Decimal = Field(ge=0)
+    payment_method: str | None = None
+
+    @field_validator("amount_paid")
+    @classmethod
+    def amount_paid_must_be_finite(cls, value: Decimal) -> Decimal:
+        if not value.is_finite():
+            raise ValueError("Amount paid must be finite")
+        return value
+
+
+class PaymentCollectionRequest(BaseModel):
+    invoice_id: int
+    amount: Decimal = Field(gt=0)
+    payment_method: str = Field(min_length=1)
+
+    @field_validator("amount")
+    @classmethod
+    def amount_must_be_finite(cls, value: Decimal) -> Decimal:
+        if not value.is_finite():
+            raise ValueError("Payment amount must be finite")
+        return value
+
+
+class SaleTransactionResponse(BaseModel):
+    id: int
+    invoice_id: int
+    receipt_url: str
+    customer_id: int | None = None
+    invoice_status: str | None = None
+    invoice_total: Decimal | None = None
+    amount_paid: Decimal = Decimal("0")
+    balance_due: Decimal | None = None
+    item_id: int
+    item_name: str | None = None
+    quantity: Decimal
+    unit_price: Decimal | None = None
+    total_price: Decimal
+    price_type: str | None = None
+    payment_method: str | None = None
     added_by: int | None = None
-    location: str
+    location: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
+
+
+class SalePaymentResponse(BaseModel):
+    id: int
+    invoice_id: int
+    amount: Decimal
+    payment_method: str
+    status: str
+    collected_by: int | None = None
+    created_at: str | None = None

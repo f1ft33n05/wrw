@@ -1,0 +1,129 @@
+{% include "header.html" %}
+<body>
+  <header>
+    <nav>
+      <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/working--.png') }}" alt="We are Wines Logo"></a></div>
+      <ul>
+        <li><a href="/sales/pos">New sale</a></li>
+        <li>{{ user.username }}</li>
+      </ul>
+    </nav>
+  </header>
+  <div class="container row">
+      <aside class="col-xs-12 col-md-2">
+        <nav>
+          <ul>
+            <li><a href="/dashboard">Home</a></li>
+            {% if user.role in ["admin", "manager"] %}
+              <li>
+                <details name="sell">
+                  <summary>Users</summary>
+                  <ul>
+                    <li><a href="/users">All Users</a></li>
+                    <li><a href="/roles">Roles</a></li>
+                  </ul>
+                </details>
+              </li>
+            {% endif %}
+            <li>
+              <details name="sell">
+                <summary>Contacts</summary>
+                <ul>
+                  <li><a href="/suppliers">Suppliers</a></li>
+                  <li><a href="/customers">Customers</a></li>
+                  <li><a href="/resellers">Resellers</a></li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <details name="sell">
+                <summary>Items</summary>
+                <ul>
+                  <li><a href="/items">List Items</a></li>
+                  <li><a href="/add_item">Add Item</a></li>
+                  <li><a href="/import_items">Import Items</a></li>
+                  <li><a href="/item_categories">Categories</a></li>
+                  <li><a href="/discounts">Discounts</a></li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <details name="sell">
+                <summary>Sell</summary>
+                <ul>
+                  <li><a href="/sales/list">All Sales</a></li>
+                  <li><a href="/sales/pos">POS</a></li>
+                  <li><a href="/sales_events">Events</a></li>
+                  <li><a href="/reseller_pg">Reseller</a></li>
+                </ul>
+              </details>
+            </li>
+            <li><a href="/sales/list">Receipts and payments</a></li>
+            <li><a href="/quotations">Quotes</a></li>
+            <li><a href="/invoices">Invoices</a></li>
+            <li><a href="/purchases">Purchases</a></li>
+            <li><a href="/inventory">Inventory</a></li>
+            <li>
+              <details name="sell">
+                <summary>Reports</summary>
+                <ul>
+                  <li><a href="/sales_report">Sales Report</a></li>
+                  <li><a href="/stock_report">Stock Report</a></li>
+                  <li><a href="/purchase_sale_report">Purchase & Sale Report</a></li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <form action="/auth/logout" method="post">
+                <button type="submit" class="logout-link">Log out</button>
+              </form>
+            </li>
+          </ul>
+        </nav>
+      </aside>
+    <main class="col-xs-12 col-md-9">
+      <article class="all-users-container">
+        <header class="row">
+          <section class="title">
+            <h1>Sales</h1>&nbsp;&bull;&nbsp;<span>All sales</span>
+          </section>
+          <a role="button" class="secondary" href="/sales/pos">New sale</a>
+        </header>
+        <table class="striped">
+          <thead>
+            <tr>
+              <th scope="col">Invoice</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Date</th>
+              <th scope="col">Total Due</th>
+              <th scope="col">Paid</th>
+              <th scope="col">Balance Due</th>
+              <th scope="col">Status</th>
+              <th scope="col">Receipt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sale in sales %}
+            <tr>
+              <td>#{{ sale.invoice.id }}</td>
+              <td>{{ sale.customer_name or "Walk-in customer" }}</td>
+              <td>{{ sale.created_at or "N/A" }}</td>
+              <td>{{ sale.total|money }}</td>
+              <td>{{ sale.paid|money }}</td>
+              <td>{{ sale.balance_due|money }}</td>
+              <td>{{ sale.invoice.status|replace("_", " ")|title }}</td>
+              <td><a href="/sales/{{ sale.invoice.id }}/receipt">View</a></td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="8">No sales found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <small id="sales-count">{{ sales|length }} sale{% if sales|length != 1 %}s{% endif %}</small>
+      </article>
+    </main>
+  </div>
+</body>
+</html>

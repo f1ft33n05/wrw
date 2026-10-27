@@ -1,0 +1,94 @@
+{% include "header.html" %}
+<style>
+  @media print {
+    .no-print { display: none !important; }
+    main.receipt { max-width: 100%; padding: 0; }
+  }
+  img {
+    width: 30rem;
+    padding: 1rem;
+    margin-bottom: 3rem;
+  }
+</style>
+<body>
+  <main class="container receipt">
+    <nav class="no-print">
+      <ul><li><strong>Sale receipt</strong></li></ul>
+      <ul>
+        <li><a href="/sales/pos">New sale</a></li>
+        <li><a href="/sales/list">All sales</a></li>
+        <li><button type="button" onclick="window.print()">Print</button></li>
+      </ul>
+    </nav>
+    <article>
+        <img id="receipt-logo" src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="" id="receipt-logo">
+        <h2>Receipt #: {{ invoice.id }}</h2>
+        <h3>Date: {{ invoice_created_at }}</h3>
+        <p>Customer: {{ customer.name if customer else "Walk-in customer" }}</p>
+      <table>
+        <thead>
+          <tr><th>Item</th><th>Qty</th><th>Price Split</th><th>Unit Price</th><th>Total</th></tr>
+        </thead>
+        <tbody>
+          {% for line in lines %}
+          <tr>
+            <td>{{ line.name }}</td>
+            <td>{{ line.quantity }}</td>
+            <td>{{ line.price_breakdown }}</td>
+            <td>{{ line.unit_prices }}</td>
+            <td>{{ line.total|money }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p><strong>Total: {{ total|money }}</strong></p>
+      <h3>Payments</h3>
+      {% if payments %}
+      <table>
+        <thead><tr><th>Date</th><th>Method</th><th>Amount</th><th>Collected by</th></tr></thead>
+        <tbody>
+          {% for payment in payments %}
+          <tr>
+            <td>{{ payment.created_at }}</td>
+            <td>{{ payment.payment_method }}</td>
+            <td>{{ payment.amount|money }}</td>
+            <td>{{ payment.collector or "Unknown" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>No payments recorded yet.</p>
+      {% endif %}
+      <p>Paid: {{ paid|money }}</p>
+      <p>Change: {{ change_amount|money }}</p>
+      <p><strong>Balance Due: {{ balance_due|money }}</strong></p>
+      <p>Payment Status: {{ invoice.status|replace("_", " ")|title }}</p>
+
+      {% if balance_due > 0 %}
+      <section class="no-print">
+        <h3>Record a Payment</h3>
+        <form id="receipt-payment-form" data-invoice-id="{{ invoice.id }}">
+          <label>
+            Amount (MWK)
+            <input type="number" name="amount" min="0.01" max="{{ balance_due }}" step="0.01" required>
+          </label>
+          <label>
+            Payment Method
+            <select name="payment_method" required>
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="mobile money">Mobile Money</option>
+              <option value="bank transfer">Bank Transfer</option>
+            </select>
+          </label>
+          <p id="receipt-payment-error" role="alert"></p>
+          <button type="submit" id="record-payment">Record Payment</button>
+        </form>
+      </section>
+      {% endif %}
+    </article>
+  </main>
+  <script src="{{ url_for('static', path='js/receipt.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+{% include "header.html" %}
+<body>
+  <main class="">
+      <header>
+        <nav>
+            <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/working--.png') }}" alt="We are Wines Logo"></a></div>
+            <ul>
+                <li><a href="/sales/list">All sales</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li>
+                <details class="dropdown">
+                    <summary id="user-avatar">
+                      <img src="{{ url_for('static', path='images/user-avatar.png') }}" alt="We are Wines Logo">
+                    </summary>
+                    <ul dir="rtl">
+                    <li><a href="#">Profile</a></li>
+                    <li><a href="#">Settings</a></li>
+                    <li><a href="#">Logout</a></li>
+                    </ul>
+                </details>
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    <article id="pos-form-container">
+      <h1>New sale</h1>
+    <form id="pos-form">
+      <div class="grid">
+        <label>
+          Customer
+          <select name="customer_id">
+            {% for customer in customers %}
+            <option value="{{ customer.id }}">{{ customer.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </div>
+
+      <div class="grid">
+        <label>
+          Item
+          <select id="item-selection">
+            <option value="">Select an item</option>
+            {% for item in items %}
+            <option
+              value="{{ item.id }}"
+              data-retail="{{ item.selling_price_retail }}"
+              data-wholesale="{{ item.selling_price_wholesale }}"
+              data-wholesale-threshold="{{ item.wholesale_threshold or 6 }}"
+              data-stock="{{ item.quantity }}"
+              data-name="{{ item.name }}"
+            >{{ item.name }} (wholesale threshold: {{ item.wholesale_threshold or 6 }}; stock: {{ item.quantity }})</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Quantity
+          <input id="item-quantity" type="number" min="1" step="1" value="1">
+        </label>
+        <div>
+          <label>Unit Price <output id="selected-price">-</output></label>
+          <button type="button" id="add-to-cart">Add item</button>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Item</th><th>Qty</th><th>Price Split</th><th>Unit Price</th><th>Line total</th><th></th></tr>
+        </thead>
+        <tbody id="cart-lines">
+          <tr id="empty-cart"><td colspan="6">No items added.</td></tr>
+        </tbody>
+      </table>
+      <p class="text-right"><strong>Total: <span id="sale-total">MWK 0.00</span></strong></p>
+      <p class="text-right">Change: <span id="sale-change">MWK 0.00</span></p>
+
+      <div class="grid">
+        <label>
+          Amount received (MWK)
+          <input type="number" name="amount_paid" min="0" step="1.00" value="0.00" required>
+        </label>
+        <label>
+          Payment Method
+          <select name="payment_method">
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="mobile money">Mobile money</option>
+            <option value="bank transfer">Bank transfer</option>
+          </select>
+        </label>
+        <label>
+          Location
+          <input name="location" value="store" required>
+        </label>
+      </div>
+      <p id="pos-error" role="alert"></p>
+      <button type="submit" id="complete-sale">Checkout</button>
+    </form>
+    </article>
+  </main>
+  <script src="{{ url_for('static', path='js/pos.js') }}"></script>
+</body>
+</html>
