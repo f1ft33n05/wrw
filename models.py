@@ -1,21 +1,50 @@
 from pydantic import BaseModel
+from enum import Enum
+
+class Role(str, Enum):
+    admin = "admin"
+    manager = "manager"
+    cashier = "cashier"
+
 
 class User(BaseModel):
     id: int
     username: str
     password: str
-    role: str
+    role: Role
 
 
 class CreateUserRequest(BaseModel):
     id: int | None = None
+    name: str
     username: str
     password: str
     email: str
     phone: str
-    role: str
+    role: Role
     created_at: str | None = None
     updated_at: str | None = None
+
+
+class UpdateUserRequest(BaseModel):
+    name: str
+    username: str
+    email: str
+    phone: str
+    role: Role
+    password: str | None = None
+
+
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    username: str
+    email: str
+    phone: str
+    role: Role
+    created_at: str | None = None
+    updated_at: str | None = None
+
 
 class CreateContactRequest(BaseModel):
     id: int | None = None
@@ -53,7 +82,7 @@ class CreateSaleRequest(BaseModel):
     quantity: float
     total_price: float
     payment_method: str
-    added_by: int
+    added_by: int | None = None
     location: str
     created_at: str | None = None
     updated_at: str | None = None

@@ -1,20 +1,13 @@
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi import Request
-from fastapi.responses import RedirectResponse
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from database_models import StockMvt, User, Contact, SalesTxn
-from pydantic import BaseModel
-from database import get_db, db_dependency
-from starlette import status
+from fastapi import APIRouter, Depends, HTTPException
 from typing import Annotated
-from models import CreateContactRequest, CreateSaleRequest
-from contacts import update_contact
-from items import update_item
+from database_models import SalesTxn
+from database import db_dependency
+from starlette import status
+from models import CreateSaleRequest, Role
+from routes.auth import RoleChecker, get_current_user
 
 
 router = APIRouter(
@@ -36,7 +29,11 @@ def serialize_timestamp(value: datetime | str | None) -> str | None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(APP_TIMEZONE).isoformat()
 
-@router.get("/", response_model=list[CreateSaleRequest])
+@router.get(
+    "/",
+    response_model=list[CreateSaleRequest],
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))],
+)
 async def list_sales(db: db_dependency):
     sales = db.query(SalesTxn).all()
     return [
@@ -56,8 +53,16 @@ async def list_sales(db: db_dependency):
         for sale in sales
     ]
 
-@router.post("/create", status_code=status.HTTP_201_CREATED)
-async def create_sale(db: db_dependency, create_sale_request: CreateSaleRequest):
+@router.post(
+    "/pos",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))],
+)
+async def create_sale(
+    db: db_dependency,
+    create_sale_request: CreateSaleRequest,
+    current_user: Annotated[dict, Depends(get_current_user)],
+):
     create_sale_model = SalesTxn(
         customer_id = create_sale_request.customer_id,
         invoice_id = create_sale_request.invoice_id,
@@ -65,7 +70,7 @@ async def create_sale(db: db_dependency, create_sale_request: CreateSaleRequest)
         quantity = create_sale_request.quantity,
         total_price = create_sale_request.total_price,
         payment_method = create_sale_request.payment_method,
-        added_by = create_sale_request.added_by,
+        added_by = current_user["id"],
         location = create_sale_request.location, # if not provided, default to "store", if Event, specify "Event: (name of event)"
         created_at = datetime.now(timezone.utc),
         updated_at = datetime.now(timezone.utc)
@@ -75,22 +80,19 @@ async def create_sale(db: db_dependency, create_sale_request: CreateSaleRequest)
     db.refresh(create_sale_model)
     return {"message": "Sale created successfully", "sale_id": create_sale_model.id}
 
-@router.post("/pay", status_code=status.HTTP_200_OK) # must work for both direct sales and invoiced sales
+@router.post(
+    "/pay",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))],
+)
 async def pay_sale(db: db_dependency, invoice_id: int, payment_method: str, tendered_amount: float):
     sale = db.query(SalesTxn).filter(SalesTxn.invoice_id == invoice_id).first()
-
-    invoice_amount = sale.total_price
-
     if not sale:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sale not found")
 
+    invoice_amount = float(sale.total_price)
     change_due = tendered_amount - invoice_amount
-
-
-    if change_due < 0:
-        outstanding_balance = -(float(invoice_amount) - tendered_amount)
-
-    update_item()
+    outstanding_balance = max(invoice_amount - tendered_amount, 0)
 
     sale.payment_method = payment_method
     sale.updated_at = datetime.now(timezone.utc)

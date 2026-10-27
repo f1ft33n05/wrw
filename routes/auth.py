@@ -8,10 +8,10 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from database_models import User
-from database import get_db, db_dependency
+from database import db_dependency
 from starlette import status
 from typing import Annotated
-from models import Token
+from models import Role, Token
 
 load_dotenv()  # loads .env in the project root
 
@@ -26,6 +26,7 @@ router = APIRouter(
 bcrypt_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token', auto_error=False)
+
 
 @router.post("/token", response_model=Token)
 async def generate_access_token(db: db_dependency, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
@@ -108,6 +109,7 @@ def create_access_token(username: str, user_id: int, role: str, expires_delta: t
 async def get_current_user(
     request: Request,
     token: Annotated[str | None, Depends(oauth2_bearer)],
+    db: db_dependency,
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -118,11 +120,28 @@ async def get_current_user(
         raise credentials_exception
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        user_id: int = payload.get("id")
-        role: str = payload.get("role")
-        if username is None or user_id is None or role is None:
+        username = payload.get("sub")
+        user_id = payload.get("id")
+        if not isinstance(username, str) or not isinstance(user_id, int):
             raise credentials_exception
-        return {"username": username, "id": user_id, "role": role}
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is None or user.username != username:
+            raise credentials_exception
+        return {"username": user.username, "id": user.id, "role": user.role}
     except JWTError:
         raise credentials_exception
+
+
+class RoleChecker:
+    def __init__(self, *allowed_roles: Role):
+        self.allowed_roles = {role.value for role in allowed_roles}
+
+    async def __call__(
+        self,
+        current_user: Annotated[dict, Depends(get_current_user)],
+    ):
+        if current_user["role"] not in self.allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to access this resource",
+            )

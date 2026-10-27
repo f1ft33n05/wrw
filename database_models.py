@@ -7,6 +7,7 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
     username = Column(String, unique=True, index=True)
     password = Column(String)
     email = Column(String, unique=True, index=True)
@@ -48,11 +49,12 @@ class SalesTxn(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer)
-    invoice_id = Column(Integer, foreign_key="invoices.id")
+    invoice_id = Column(Integer)
+    item_id = Column(Integer)
     quantity = Column(String)
     total_price = Column(String)
     payment_method = Column(String)
-    added_by = Column(Integer, foreign_key="users.id")
+    added_by = Column(Integer)
     location = Column(String) # e.g., "store", "online", "Event: (name of event)"
     created_at = Column(String)
     updated_at = Column(String)
@@ -143,4 +145,3 @@ class PaymmetMethods(Base):
     description = Column(String)
     created_at = Column(String)
     updated_at = Column(String)
-

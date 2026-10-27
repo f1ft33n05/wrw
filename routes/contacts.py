@@ -13,6 +13,8 @@ from database import get_db, db_dependency
 from starlette import status
 from typing import Annotated
 from models import CreateContactRequest
+from models import Role
+from routes.auth import RoleChecker
 
 
 router = APIRouter(
@@ -36,7 +38,11 @@ def serialize_timestamp(value: datetime | str | None) -> str | None:
 
 bcrypt_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
-@router.get("/", response_model=list[CreateContactRequest])
+@router.get(
+    "/",
+    response_model=list[CreateContactRequest],
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))],
+)
 async def list_contacts(db: db_dependency):
     contacts = db.query(Contact).all()
     return [
@@ -54,7 +60,11 @@ async def list_contacts(db: db_dependency):
         for contact in contacts
     ]
 
-@router.post("/create", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/create",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager))],
+)
 async def create_contact(db: db_dependency, create_contact_request: CreateContactRequest):
     create_contact_model = Contact(
         name = create_contact_request.name,
@@ -70,7 +80,11 @@ async def create_contact(db: db_dependency, create_contact_request: CreateContac
     db.add(create_contact_model)
     db.commit()
 
-@router.get("/{contact_id}", response_model=CreateContactRequest)
+@router.get(
+    "/{contact_id}",
+    response_model=CreateContactRequest,
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))],
+)
 async def get_contact(contact_id: int, db: db_dependency):
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
@@ -87,7 +101,11 @@ async def get_contact(contact_id: int, db: db_dependency):
         updated_at=serialize_timestamp(contact.updated_at)
     )
 
-@router.put("/{contact_id}", response_model=CreateContactRequest)
+@router.put(
+    "/{contact_id}",
+    response_model=CreateContactRequest,
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager))],
+)
 async def update_contact(contact_id: int, update_contact_request: CreateContactRequest, db: db_dependency):
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:
@@ -116,7 +134,11 @@ async def update_contact(contact_id: int, update_contact_request: CreateContactR
         updated_at=serialize_timestamp(contact.updated_at)
     )
 
-@router.delete("/{contact_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{contact_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager))],
+)
 async def delete_contact(contact_id: int, db: db_dependency):
     contact = db.query(Contact).filter(Contact.id == contact_id).first()
     if not contact:

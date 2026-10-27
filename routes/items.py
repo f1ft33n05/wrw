@@ -1,10 +1,11 @@
 
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from database_models import Item
 from database import db_dependency
-from models import CreateItemRequest
+from models import CreateItemRequest, Role
+from routes.auth import RoleChecker
 
 
 router = APIRouter(
@@ -26,7 +27,11 @@ def serialize_timestamp(value: datetime | str | None) -> str | None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(APP_TIMEZONE).isoformat()
 
-@router.get("/", response_model=list[CreateItemRequest])
+@router.get(
+    "/",
+    response_model=list[CreateItemRequest],
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))],
+)
 async def list_items(db: db_dependency):
     items = db.query(Item).all()
     return [
@@ -46,7 +51,11 @@ async def list_items(db: db_dependency):
         for item in items
     ]
 
-@router.post("/create", status_code=201)
+@router.post(
+    "/create",
+    status_code=201,
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager))],
+)
 async def create_item(db: db_dependency, create_item_request: CreateItemRequest):
     create_item_model = Item(
         name=create_item_request.name,
@@ -64,7 +73,11 @@ async def create_item(db: db_dependency, create_item_request: CreateItemRequest)
     db.add(create_item_model)
     db.commit()
 
-@router.get("/{item_id}", response_model=CreateItemRequest)
+@router.get(
+    "/{item_id}",
+    response_model=CreateItemRequest,
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))],
+)
 async def get_item(item_id: int, db: db_dependency):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
@@ -83,7 +96,11 @@ async def get_item(item_id: int, db: db_dependency):
         updated_at=serialize_timestamp(item.updated_at)
     )
 
-@router.put("/{item_id}", response_model=CreateItemRequest)
+@router.put(
+    "/{item_id}",
+    response_model=CreateItemRequest,
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager))],
+)
 async def update_item(item_id: int, update_item_request: CreateItemRequest, db: db_dependency):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
@@ -101,7 +118,11 @@ async def update_item(item_id: int, update_item_request: CreateItemRequest, db: 
 
     db.commit()
 
-@router.delete("/{item_id}", status_code=204)
+@router.delete(
+    "/{item_id}",
+    status_code=204,
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager))],
+)
 async def delete_item(item_id: int, db: db_dependency):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
@@ -109,4 +130,3 @@ async def delete_item(item_id: int, db: db_dependency):
 
     db.delete(item)
     db.commit()
-

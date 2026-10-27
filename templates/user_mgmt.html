@@ -1,0 +1,249 @@
+{%include "header.html" %}
+<body>
+    <header>
+        <nav>
+            <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/working--.png') }}" alt="We are Wines Logo"></a></div>
+            <ul>
+                <li>
+                <details class="dropdown">
+                    <summary id="user-avatar">
+                      <img src="{{ url_for('static', path='images/user-avatar.png') }}" alt="We are Wines Logo">
+                    </summary>
+                    <ul dir="rtl">
+                    <li><a href="#">Profile</a></li>
+                    <li><a href="#">Settings</a></li>
+                    <li><a href="#">Logout</a></li>
+                    </ul>
+                </details>
+                </li>
+            </ul>
+        </nav>
+    </header>
+    <div class="container row">
+      <aside class="col-xs-12 col-md-2">
+        <nav>
+          <ul>
+            <li><a href="/dashboard">Home</a></li>
+            <li>
+              <details name="sell">
+                <summary>Users</summary>
+                <ul>
+                  <li><a href="/users" aria-current="page">All Users</a></li>
+                  <li><a href="/roles">Roles</a></li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <details name="sell">
+                <summary>Contacts</summary>
+                <ul>
+                  <li><a href="/suppliers">Suppliers</a></li>
+                  <li><a href="/customers">Customers</a></li>
+                  <li><a href="/resellers">Resellers</a></li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <details name="sell">
+                <summary>Items</summary>
+                <ul>
+                  <li><a href="/items">List Items</a></li>
+                  <li><a href="/add_item">Add Item</a></li>
+                  <li><a href="/import_items">Import Items</a></li>
+                  <li><a href="/item_categories">Categories</a></li>
+                  <li><a href="/discounts">Discounts</a></li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <details name="sell">
+                <summary>Sell</summary>
+                <ul>
+                  <li><a href="/all_sales">All Sales</a></li>
+                  <li><a href="/pos_terminal">POS</a></li>
+                  <li><a href="/sales_events">Events</a></li>
+                  <li><a href="/reseller_pg">Reseller</a></li>
+                </ul>
+              </details>
+            </li>
+            <li><a href="/receipts">Receipts</a></li>
+            <li><a href="/quotations">Quotes</a></li>
+            <li><a href="/invoices">Invoices</a></li>
+            <li><a href="/purchases">Purchases</a></li>
+            <li><a href="/inventory">Inventory</a></li>
+            <li>
+              <details name="sell">
+                <summary>Reports</summary>
+                <ul>
+                  <li><a href="/sales_report">Sales Report</a></li>
+                  <li><a href="/stock_report">Stock Report</a></li>
+                  <li><a href="/purchase_sale_report">Purchase & Sale Report</a></li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <form action="/auth/logout" method="post">
+                <button type="submit" class="logout-link">Log out</button>
+              </form>
+            </li>
+          </ul>
+        </nav>
+
+      </aside>
+      <main class="col-xs-12 col-md-9">
+        <article class="all-users-container">
+            <header class="row">
+                <section class="title">
+                    <h1>Users</h1>&nbsp;&bull;&nbsp;<span>All users</span>
+                </section>
+                <button class="secondary" type="button" data-add-user>Add</button>
+            </header>
+            <table class="striped">
+                <thead>
+                    <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col">Username</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Role</th>
+                        <th scope="col">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for account in users %}
+                    <tr>
+                        <td>{{ account.name }}</td>
+                        <td>{{ account.username }}</td>
+                        <td>{{ account.email }}</td>
+                        <td>{{ account.role }}</td>
+                        <td>
+                            {% if user.role != "manager" or account.role != "admin" %}
+                            <button
+                                type="button"
+                                data-edit-user
+                                data-user-id="{{ account.id }}"
+                                data-user-name="{{ account.name }}"
+                                data-user-username="{{ account.username }}"
+                                data-user-email="{{ account.email }}"
+                                data-user-phone="{{ account.phone }}"
+                                data-user-role="{{ account.role }}"
+                            >Edit</button>
+                            <button
+                                type="button"
+                                class="pico-background-red-700"
+                                data-delete-user
+                                data-user-id="{{ account.id }}"
+                                data-user-name="{{ account.name }}"
+                            >Delete</button>
+                            {% else %}
+                            <span>Protected admin</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5">No users found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <small id="user-count">{{ users|length }} user{% if users|length != 1 %}s{% endif %}</small>
+        </article>
+        <dialog id="user-create-dialog">
+            <article>
+                <h2>Add user</h2>
+                <form id="user-create-form">
+                    <label>
+                        Name
+                        <input type="text" name="name" autocomplete="name" required>
+                    </label>
+                    <label>
+                        Username
+                        <input type="text" name="username" autocomplete="username" required>
+                    </label>
+                    <label>
+                        Email
+                        <input type="email" name="email" autocomplete="email" required>
+                    </label>
+                    <label>
+                        Phone
+                        <input type="tel" name="phone" autocomplete="tel" required>
+                    </label>
+                    <label>
+                        Role
+                        <select name="role" required>
+                            {% for role in roles %}
+                            <option value="{{ role.value }}">{{ role.value|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label>
+                        Password
+                        <input type="password" name="password" autocomplete="new-password" required>
+                    </label>
+                    <p id="create-user-error" role="alert"></p>
+                    <footer>
+                        <button class="secondary" type="button" data-cancel-create-user>Cancel</button>
+                        <button type="submit" id="create-user-submit">Create user</button>
+                    </footer>
+                </form>
+            </article>
+        </dialog>
+        <dialog id="user-delete-dialog">
+            <article>
+                <h2>Delete user</h2>
+                <p>Are you sure you want to delete <strong id="delete-user-name"></strong>?</p>
+                <p id="delete-user-error" role="alert"></p>
+                <footer>
+                    <button class="secondary" type="button" data-cancel-delete>Cancel</button>
+                    <button type="button" class="pico-background-red-700" id="confirm-delete-user">Confirm delete</button>
+                </footer>
+            </article>
+        </dialog>
+        <dialog id="user-edit-dialog">
+            <article>
+                <h2>Edit user</h2>
+                <form id="user-edit-form">
+                    <label>
+                        Name
+                        <input type="text" name="name" required>
+                    </label>
+                    <label>
+                        Username
+                        <input type="text" name="username" required>
+                    </label>
+                    <label>
+                        Email
+                        <input type="email" name="email" required>
+                    </label>
+                    <label>
+                        Phone
+                        <input type="tel" name="phone" required>
+                    </label>
+                    <label>
+                        Role
+                        <select name="role" required>
+                            {% for role in roles %}
+                            <option value="{{ role.value }}">{{ role.value|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label>
+                        New password
+                        <input type="password" name="password" autocomplete="new-password">
+                    </label>
+                    <small>Leave the password blank to keep the current password.</small>
+                    <p id="edit-user-error" role="alert"></p>
+                    <footer>
+                        <button class="secondary" type="button" data-cancel-edit>Cancel</button>
+                        <button type="submit" id="save-user-changes">Save changes</button>
+                    </footer>
+                </form>
+            </article>
+        </dialog>
+
+      </main>
+    </div>
+<script src="{{ url_for('static', path='js/app.js') }}"></script>
+
+</body>
+</html>
