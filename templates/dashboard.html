@@ -64,14 +64,18 @@
                   <li><a href="/sales/list">All Sales</a></li>
                   <li><a href="/sales/pos">POS</a></li>
                   <li><a href="/sales_events">Events</a></li>
+                  {% if user.role in ["admin", "manager"] %}
                   <li><a href="/reseller_pg">Reseller</a></li>
+                  {% endif %}
                 </ul>
               </details>
             </li>
             <li><a href="/sales/list">Receipts and payments</a></li>
             <li><a href="/quotations">Quotes</a></li>
             <li><a href="/invoices">Invoices</a></li>
+            {% if user.role in ["admin", "manager"] %}
             <li><a href="/purchases">Purchases</a></li>
+            {% endif %}
             <li><a href="/inventory">Inventory</a></li>
             <li>
               <details name="sell">

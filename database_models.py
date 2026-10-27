@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -83,6 +83,92 @@ class ResellerTxns(Base):
     quantity = Column(String)
     total_price = Column(String)
     payment_method = Column(String)
+    created_at = Column(String)
+    updated_at = Column(String)
+
+class Purchases(Base):
+    __tablename__ = "purchases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    supplier_id = Column(Integer, nullable=False, index=True)
+    total_amount = Column(String, nullable=False)
+    created_by = Column(Integer)
+    created_at = Column(String)
+    updated_at = Column(String)
+
+class PurchaseLines(Base):
+    __tablename__ = "purchase_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    purchase_id = Column(Integer, nullable=False, index=True)
+    item_id = Column(Integer, nullable=False)
+    quantity = Column(String, nullable=False)
+    unit_cost = Column(String, nullable=False)
+    total_amount = Column(String, nullable=False)
+
+class SupplierPayments(Base):
+    __tablename__ = "supplier_payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    purchase_id = Column(Integer, nullable=False, index=True)
+    amount = Column(String, nullable=False)
+    payment_method = Column(String, nullable=False)
+    recorded_by = Column(Integer)
+    created_at = Column(String)
+    updated_at = Column(String)
+
+class ResellerAllocations(Base):
+    __tablename__ = "reseller_allocations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reseller_id = Column(Integer, nullable=False, index=True)
+    allocated_by = Column(Integer)
+    created_at = Column(String)
+    updated_at = Column(String)
+
+class ResellerAllocationLines(Base):
+    __tablename__ = "reseller_allocation_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    allocation_id = Column(Integer, nullable=False, index=True)
+    item_id = Column(Integer, nullable=False)
+    quantity_allocated = Column(String, nullable=False)
+    quantity_remaining = Column(String, nullable=False)
+    unit_price = Column(String, nullable=False)
+
+class ResellerReconciliations(Base):
+    __tablename__ = "reseller_reconciliations"
+    __table_args__ = (
+        UniqueConstraint("reseller_id", "period", name="uq_reseller_reconciliation_period"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    reseller_id = Column(Integer, nullable=False, index=True)
+    period = Column(String, nullable=False)
+    total_due = Column(String, nullable=False)
+    reconciled_by = Column(Integer)
+    created_at = Column(String)
+    updated_at = Column(String)
+
+class ResellerReconciliationLines(Base):
+    __tablename__ = "reseller_reconciliation_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reconciliation_id = Column(Integer, nullable=False, index=True)
+    allocation_line_id = Column(Integer, nullable=False)
+    quantity_sold = Column(String, nullable=False)
+    quantity_returned = Column(String, nullable=False)
+    unit_price = Column(String, nullable=False)
+    total_due = Column(String, nullable=False)
+
+class ResellerPayments(Base):
+    __tablename__ = "reseller_payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reseller_id = Column(Integer, nullable=False, index=True)
+    amount = Column(String, nullable=False)
+    payment_method = Column(String, nullable=False)
+    recorded_by = Column(Integer)
     created_at = Column(String)
     updated_at = Column(String)
 

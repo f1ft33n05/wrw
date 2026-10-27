@@ -30,6 +30,7 @@
         <label>
           Customer
           <select name="customer_id">
+            <option value="">Walk-in customer</option>
             {% for customer in customers %}
             <option value="{{ customer.id }}">{{ customer.name }}</option>
             {% endfor %}

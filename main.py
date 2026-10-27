@@ -12,6 +12,8 @@ import routes.user_mgmt as user_mgmt
 import routes.contacts as contacts
 import routes.items as items
 import routes.sales as sales
+import routes.purchases as purchases
+import routes.resellers as resellers
 from routes.auth import get_current_user
 from models import Role
 from routes.auth import RoleChecker
@@ -21,8 +23,11 @@ app = FastAPI()
 app.include_router(auth.router)
 app.include_router(user_mgmt.router)
 app.include_router(contacts.router)
+app.include_router(contacts.pages_router)
 app.include_router(items.router)
 app.include_router(sales.router)
+app.include_router(purchases.router)
+app.include_router(resellers.router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

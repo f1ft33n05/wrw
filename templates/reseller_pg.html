@@ -1,0 +1,164 @@
+{% include "header.html" %}
+<body>
+  <header>
+    <nav>
+      <ul><li><strong>Reseller consignment</strong></li></ul>
+      <ul>
+        <li><a href="/resellers">Resellers</a></li>
+        <li><a href="/dashboard">Dashboard</a></li>
+        <li>{{ user.username }}</li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    <h1>Reseller consignment and reconciliation</h1>
+    <form method="get" action="/reseller_pg">
+      <label>Reseller
+        <select name="reseller_id" required onchange="this.form.submit()">
+          {% for reseller in resellers %}
+          <option value="{{ reseller.id }}" {% if selected_reseller and reseller.id == selected_reseller.id %}selected{% endif %}>{{ reseller.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+
+    {% if selected_reseller %}
+    <section class="grid">
+      <article><strong>Reconciled sales</strong><p>{{ total_due|money }}</p></article>
+      <article><strong>Payments</strong><p>{{ total_paid|money }}</p></article>
+      <article><strong>Balance Due</strong><p>{{ balance_due|money }}</p></article>
+    </section>
+
+    <details open>
+      <summary>Allocate consignment to {{ selected_reseller.name }}</summary>
+      <form id="allocation-form" data-reseller-id="{{ selected_reseller.id }}">
+        <table>
+          <thead><tr><th>Item</th><th>Quantity</th><th>Agreed unit price (MWK)</th><th></th></tr></thead>
+          <tbody id="allocation-lines"></tbody>
+        </table>
+        <button type="button" class="secondary" id="add-allocation-line">Add item</button>
+        <p id="allocation-error" role="alert"></p>
+        <button type="submit">Allocate stock</button>
+      </form>
+    </details>
+
+    <details open>
+      <summary>Reconcile month</summary>
+      <form id="reconciliation-form" data-reseller-id="{{ selected_reseller.id }}">
+        <label>Month
+          <input type="month" name="period" value="{{ current_period }}" max="{{ current_period }}" required>
+        </label>
+        <p>Enter units sold and returned. Any remaining units stay with the reseller and carry forward.</p>
+        <table>
+          <thead><tr><th>Item</th><th>Allocated</th><th>Still held</th><th>Unit price</th><th>Sold</th><th>Returned</th></tr></thead>
+          <tbody>
+            {% for holding in holdings %}
+            <tr>
+              <td>{{ holding.item_name }}</td>
+              <td>{{ holding.line.quantity_allocated }}</td>
+              <td>{{ holding.line.quantity_remaining }}</td>
+              <td>{{ holding.line.unit_price|money }}</td>
+              <td>
+                <input aria-label="Units sold" type="number" min="0" max="{{ holding.line.quantity_remaining }}" step="0.01" value="0"
+                  data-reconcile-line="{{ holding.line.id }}" data-reconcile-field="sold">
+              </td>
+              <td>
+                <input aria-label="Units returned" type="number" min="0" max="{{ holding.line.quantity_remaining }}" step="0.01" value="0"
+                  data-reconcile-line="{{ holding.line.id }}" data-reconcile-field="returned">
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">No reseller-held stock to reconcile.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p id="reconciliation-error" role="alert"></p>
+        <button type="submit">Save reconciliation</button>
+      </form>
+    </details>
+
+    <h2>Reseller-held stock</h2>
+    <table class="striped">
+      <thead><tr><th>Item</th><th>Allocation</th><th>Allocated</th><th>Remaining</th><th>Unit price</th></tr></thead>
+      <tbody>
+        {% for holding in holdings %}
+        <tr>
+          <td>{{ holding.item_name }}</td>
+          <td>#{{ holding.allocation.id }} · {{ display_timestamp(holding.allocation.created_at) }}</td>
+          <td>{{ holding.line.quantity_allocated }}</td>
+          <td>{{ holding.line.quantity_remaining }}</td>
+          <td>{{ holding.line.unit_price|money }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">No stock currently held by this reseller.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2>Reconciliation history</h2>
+    <table class="striped">
+      <thead><tr><th>Month</th><th>Date recorded</th><th>Reconciled items</th><th>Amount due</th></tr></thead>
+      <tbody>
+        {% for row in reconciliations %}
+        <tr>
+          <td>{{ row.reconciliation.period }}</td>
+          <td>{{ display_timestamp(row.reconciliation.created_at) }}</td>
+          <td>
+            {% for line in row.lines %}
+            {{ line.item_name }}: {{ line.sold }} sold @ {{ line.unit_price|money }}, {{ line.returned }} returned ({{ line.due|money }}){% if not loop.last %}<br>{% endif %}
+            {% else %}
+            No units sold or returned
+            {% endfor %}
+          </td>
+          <td>{{ row.total|money }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">No reconciliations yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2>Record reseller payment</h2>
+    {% if balance_due > 0 %}
+    <form id="reseller-payment-form" data-reseller-id="{{ selected_reseller.id }}">
+      <div class="grid">
+        <label>Amount (MWK)<input type="number" name="amount" min="0.01" max="{{ balance_due }}" step="0.01" required></label>
+        <label>Payment method
+          <select name="payment_method" required>
+            <option value="cash">Cash</option><option value="card">Card</option>
+            <option value="mobile money">Mobile money</option><option value="bank transfer">Bank transfer</option>
+          </select>
+        </label>
+      </div>
+      <p id="reseller-payment-error" role="alert"></p>
+      <button type="submit">Record payment</button>
+    </form>
+    {% else %}
+    <p>No reseller balance is currently due.</p>
+    {% endif %}
+    <h2>Payment history</h2>
+    <table class="striped">
+      <thead><tr><th>Date</th><th>Method</th><th>Amount</th></tr></thead>
+      <tbody>
+        {% for payment in payments %}
+        <tr><td>{{ display_timestamp(payment.created_at) }}</td><td>{{ payment.payment_method }}</td><td>{{ payment.amount|money }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">No payments recorded.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>Add a reseller contact before allocating consignment.</p>
+    {% endif %}
+  </main>
+  <template id="allocation-line-template">
+    <tr>
+      <td><select name="item_id" required><option value="">Select item</option>{% for item in items %}<option value="{{ item.id }}">{{ item.name }} (stock {{ item.quantity }})</option>{% endfor %}</select></td>
+      <td><input name="quantity" type="number" min="0.01" step="0.01" required></td>
+      <td><input name="unit_price" type="number" min="0.01" step="0.01" required></td>
+      <td><button type="button" class="secondary" data-remove-allocation-line>Remove</button></td>
+    </tr>
+  </template>
+  <script src="{{ url_for('static', path='js/resellers.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+{% include "header.html" %}
+<body>
+  <header>
+    <nav>
+      <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="We are Wines"></a></div>
+      <ul>
+        <li><a href="/customers">Customers</a></li>
+        <li><a href="/suppliers">Suppliers</a></li>
+        <li><a href="/resellers">Resellers</a></li>
+        {% if contact_type == "supplier" and user.role in ["admin", "manager"] %}<li><a href="/purchases">Purchases</a></li>{% endif %}
+        {% if contact_type == "reseller" and user.role in ["admin", "manager"] %}<li><a href="/reseller_pg">Consignment</a></li>{% endif %}
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    <h1>{{ contact_type|title }} contacts</h1>
+    {% if user.role in ["admin", "manager"] %}
+    <details>
+      <summary>Add {{ contact_type }}</summary>
+      <form id="contact-create-form" data-contact-type="{{ contact_type }}">
+        <label>Name <input name="name" required></label>
+        <label>Email <input type="email" name="email"></label>
+        <label>Phone <input name="phone"></label>
+        <label>Address <input name="address"></label>
+        <p id="contact-error" role="alert"></p>
+        <button type="submit">Add {{ contact_type }}</button>
+      </form>
+    </details>
+    {% endif %}
+    <table class="striped">
+      <thead>
+        <tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Outstanding balance</th>{% if user.role in ["admin", "manager"] %}<th>Actions</th>{% endif %}</tr>
+      </thead>
+      <tbody>
+        {% for contact in contacts %}
+        <tr>
+          <td>{{ contact.name }}</td>
+          <td>{{ contact.email or "—" }}</td>
+          <td>{{ contact.phone or "—" }}</td>
+          <td>{{ contact.address or "—" }}</td>
+          <td>{{ contact_balances[contact.id]|money }}</td>
+          {% if user.role in ["admin", "manager"] %}
+          <td>
+            <button type="button" data-edit-contact
+              data-contact-id="{{ contact.id }}"
+              data-contact-name="{{ contact.name }}"
+              data-contact-email="{{ contact.email or '' }}"
+              data-contact-phone="{{ contact.phone or '' }}"
+              data-contact-address="{{ contact.address or '' }}">Edit</button>
+            <button type="button" class="pico-background-red-700" data-delete-contact
+              data-contact-id="{{ contact.id }}"
+              data-contact-name="{{ contact.name }}">Delete</button>
+          </td>
+          {% endif %}
+        </tr>
+        {% else %}
+        <tr><td colspan="{% if user.role in ['admin', 'manager'] %}6{% else %}5{% endif %}">No {{ contact_type }} contacts found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <small>{{ contacts|length }} {{ contact_type }} contact{% if contacts|length != 1 %}s{% endif %}</small>
+    {% if user.role in ["admin", "manager"] %}
+    <dialog id="contact-edit-dialog">
+      <article>
+        <h2>Edit {{ contact_type }}</h2>
+        <form id="contact-edit-form">
+          <label>Name <input name="name" required></label>
+          <label>Email <input type="email" name="email"></label>
+          <label>Phone <input name="phone"></label>
+          <label>Address <input name="address"></label>
+          <p id="contact-edit-error" role="alert"></p>
+          <footer>
+            <button type="button" class="secondary" data-cancel-contact-edit>Cancel</button>
+            <button type="submit">Save contact</button>
+          </footer>
+        </form>
+      </article>
+    </dialog>
+    {% endif %}
+  </main>
+  <script src="{{ url_for('static', path='js/contacts.js') }}"></script>
+</body>
+</html>

@@ -2,7 +2,14 @@
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException
-from database_models import Item
+from database_models import (
+    Item,
+    PurchaseLines,
+    PurchaseTxns,
+    ResellerAllocationLines,
+    ResellerTxns,
+    SalesTxn,
+)
 from database import db_dependency
 from models import CreateItemRequest, Role
 from routes.auth import RoleChecker
@@ -131,6 +138,23 @@ async def delete_item(item_id: int, db: db_dependency):
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
+
+    has_history = (
+        db.query(SalesTxn.id).filter(SalesTxn.item_id == item_id).first()
+        or db.query(PurchaseLines.id)
+        .filter(PurchaseLines.item_id == item_id)
+        .first()
+        or db.query(PurchaseTxns.id).filter(PurchaseTxns.item_id == item_id).first()
+        or db.query(ResellerAllocationLines.id)
+        .filter(ResellerAllocationLines.item_id == item_id)
+        .first()
+        or db.query(ResellerTxns.id).filter(ResellerTxns.item_id == item_id).first()
+    )
+    if has_history:
+        raise HTTPException(
+            status_code=409,
+            detail="Item has transaction or consignment history and cannot be deleted",
+        )
 
     db.delete(item)
     db.commit()
