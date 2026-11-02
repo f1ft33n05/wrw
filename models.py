@@ -141,7 +141,12 @@ class ResellerReconciliationLineRequest(BaseModel):
 
 class ResellerReconciliationRequest(BaseModel):
     reseller_id: int
-    period: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
+    reconciliation_date: str | None = Field(
+        default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"
+    )
+    period: str | None = Field(
+        default=None, pattern=r"^\d{4}-(0[1-9]|1[0-2])$"
+    )
     lines: list[ResellerReconciliationLineRequest] = Field(default_factory=list)
 
 
@@ -164,14 +169,15 @@ class Token(BaseModel):
 class CreateItemRequest(BaseModel):
     id: int | None = None
     name: str
-    description: str
+    description: str = ""
     barcode: str
     purchase_price: float
     selling_price_wholesale: float
     selling_price_retail: float
     wholesale_threshold: Decimal = Field(default=Decimal("6"), gt=0)
-    quantity: float
+    quantity: float = 0
     unit: str
+    category_id: int | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -183,9 +189,30 @@ class CreateItemRequest(BaseModel):
         return value
 
 
+class StockAdjustmentRequest(BaseModel):
+    quantity: Decimal = Field(gt=0)
+    reason: str = "Manual stock adjustment"
+
+
+class CategoryRequest(BaseModel):
+    id: int | None = None
+    name: str = Field(min_length=1)
+    description: str = ""
+
+
+class DiscountRequest(BaseModel):
+    id: int | None = None
+    name: str = Field(min_length=1)
+    discount_type: Literal["item", "category"]
+    target_id: int
+    percentage: Decimal = Field(gt=0, le=100)
+    active: bool = True
+
+
 class SaleLineRequest(BaseModel):
     item_id: int
     quantity: Decimal = Field(gt=0)
+    discount_percentage: Decimal | None = Field(default=None, ge=0, le=100)
 
     @field_validator("quantity")
     @classmethod

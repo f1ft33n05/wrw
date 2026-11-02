@@ -10,7 +10,7 @@
       </ul>
     </nav>
   </header>
-  <main class="container">
+  <main id="reseller_pg_content">
     <h1>Reseller consignment and reconciliation</h1>
     <form method="get" action="/reseller_pg">
       <label>Reseller
@@ -43,10 +43,10 @@
     </details>
 
     <details open>
-      <summary>Reconcile month</summary>
+      <summary>Reconcile stock</summary>
       <form id="reconciliation-form" data-reseller-id="{{ selected_reseller.id }}">
-        <label>Month
-          <input type="month" name="period" value="{{ current_period }}" max="{{ current_period }}" required>
+        <label>Reconciliation date
+          <input type="date" name="reconciliation_date" value="{{ current_date }}" max="{{ current_date }}" required>
         </label>
         <p>Enter units sold and returned. Any remaining units stay with the reseller and carry forward.</p>
         <table>
@@ -97,11 +97,11 @@
 
     <h2>Reconciliation history</h2>
     <table class="striped">
-      <thead><tr><th>Month</th><th>Date recorded</th><th>Reconciled items</th><th>Amount due</th></tr></thead>
+      <thead><tr><th>Reconciliation date</th><th>Recorded at</th><th>Reconciled items</th><th>Amount due</th></tr></thead>
       <tbody>
         {% for row in reconciliations %}
         <tr>
-          <td>{{ row.reconciliation.period }}</td>
+          <td>{{ row.reconciliation.reconciliation_date or row.reconciliation.period ~ '-01' }}</td>
           <td>{{ display_timestamp(row.reconciliation.created_at) }}</td>
           <td>
             {% for line in row.lines %}

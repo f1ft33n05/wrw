@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from starlette import status
 
 from database import db_dependency
-from database_models import Contact, Invoices, Item, Payments, SalesTxn, StockMvt, User
+from database_models import Contact, Invoices, Item, ItemDiscount, Payments, SalesTxn, StockMvt, User
 from models import (
     CheckoutRequest,
     PaymentCollectionRequest,
@@ -57,6 +57,16 @@ def _compact_decimal(value: object, description: str) -> str:
 
 def _format_money(value: object) -> str:
     return f"MWK {_money(_decimal(value, 'money amount')):,.2f}"
+
+
+def _active_discount(db, item: Item, requested: Decimal | None = None) -> Decimal:
+    if requested is not None:
+        return requested
+    discounts = db.query(ItemDiscount).filter(ItemDiscount.active == 1).all()
+    item_discount = next((d for d in discounts if d.discount_type == "item" and d.target_id == item.id), None)
+    category_discount = next((d for d in discounts if d.discount_type == "category" and d.target_id == item.category_id), None)
+    discount = item_discount or category_discount
+    return _decimal(discount.percentage, "discount percentage") if discount else Decimal("0")
 
 
 templates.env.filters["money"] = _format_money
@@ -285,8 +295,11 @@ async def create_sale(
         )
 
     quantities: dict[int, Decimal] = {}
+    requested_discounts: dict[int, Decimal] = {}
     for line in checkout.items:
         quantities[line.item_id] = quantities.get(line.item_id, Decimal("0")) + line.quantity
+        if line.discount_percentage is not None:
+            requested_discounts[line.item_id] = line.discount_percentage
 
     try:
         items = (
@@ -359,10 +372,13 @@ async def create_sale(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"{item.name} does not have a valid retail price",
                 )
-            line_total = _money(
+            discount_percentage = _active_discount(db, item, requested_discounts.get(item_id))
+            undiscounted_total = _money(
                 wholesale_unit_price * wholesale_quantity
                 + retail_unit_price * retail_quantity
             )
+            discount_amount = _money(undiscounted_total * discount_percentage / Decimal("100"))
+            line_total = _money(undiscounted_total - discount_amount)
             if line_total <= 0:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -384,6 +400,8 @@ async def create_sale(
                     "quantity": str(quantity),
                     "unit_price": str(unit_price),
                     "total": str(line_total),
+                    "discount_percentage": str(discount_percentage),
+                    "discount_amount": str(discount_amount),
                     "price_type": price_type,
                     "wholesale_quantity": str(wholesale_quantity),
                     "wholesale_unit_price": str(wholesale_unit_price),
@@ -438,6 +456,8 @@ async def create_sale(
                     unit_price=line["unit_price"],
                     price_type=line["price_type"],
                     total_price=line["total"],
+                    discount_percentage=line["discount_percentage"],
+                    discount_amount=line["discount_amount"],
                     payment_method=checkout.payment_method if amount_paid else None,
                     added_by=current_user["id"],
                     location=checkout.location,

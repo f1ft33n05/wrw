@@ -83,3 +83,8 @@ details.dropdown>summary+ul {
     width: 60%;
     margin: auto;
 }
+
+#reseller_pg_content {
+    width: 80%;
+    margin: 3rem auto;
+}

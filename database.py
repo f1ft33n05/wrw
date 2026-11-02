@@ -59,14 +59,50 @@ def ensure_sales_columns(database_engine: Engine) -> None:
                     )
     if inspector.has_table("items"):
         columns = {column["name"] for column in inspector.get_columns("items")}
-        if "wholesale_threshold" not in columns:
-            with database_engine.begin() as connection:
+        with database_engine.begin() as connection:
+            if "wholesale_threshold" not in columns:
                 connection.execute(
                     text(
                         "ALTER TABLE items ADD COLUMN wholesale_threshold "
                         "VARCHAR NOT NULL DEFAULT '6'"
                     )
                 )
+            if "category_id" not in columns:
+                connection.execute(text("ALTER TABLE items ADD COLUMN category_id INTEGER"))
+
+    if inspector.has_table("sales_txns"):
+        columns = {column["name"] for column in inspector.get_columns("sales_txns")}
+        with database_engine.begin() as connection:
+            for name in ("discount_percentage", "discount_amount"):
+                if name not in columns:
+                    connection.execute(text(f"ALTER TABLE sales_txns ADD COLUMN {name} VARCHAR"))
+
+    if inspector.has_table("reseller_reconciliations"):
+        columns = {
+            column["name"]
+            for column in inspector.get_columns("reseller_reconciliations")
+        }
+        with database_engine.begin() as connection:
+            if "reconciliation_date" not in columns:
+                connection.execute(
+                    text(
+                        "ALTER TABLE reseller_reconciliations "
+                        "ADD COLUMN reconciliation_date VARCHAR"
+                    )
+                )
+                connection.execute(
+                    text(
+                        "UPDATE reseller_reconciliations "
+                        "SET reconciliation_date = period || '-01' "
+                        "WHERE reconciliation_date IS NULL"
+                    )
+                )
+            connection.execute(
+                text(
+                    "ALTER TABLE reseller_reconciliations "
+                    "DROP CONSTRAINT IF EXISTS uq_reseller_reconciliation_period"
+                )
+            )
 
 
 def init_db():

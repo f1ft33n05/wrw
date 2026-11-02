@@ -75,7 +75,7 @@ if (reconciliationForm) {
         });
         const payload = {
             reseller_id: Number(reconciliationForm.dataset.resellerId),
-            period: new FormData(reconciliationForm).get("period"),
+            reconciliation_date: new FormData(reconciliationForm).get("reconciliation_date"),
             lines: [...linesById.values()].filter(
                 (line) => line.quantity_sold > 0 || line.quantity_returned > 0,
             ),

@@ -143,7 +143,10 @@ async def reseller_page(
         reconciliation_rows = (
             db.query(ResellerReconciliations)
             .filter(ResellerReconciliations.reseller_id == selected.id)
-            .order_by(ResellerReconciliations.period.desc())
+            .order_by(
+                ResellerReconciliations.reconciliation_date.desc(),
+                ResellerReconciliations.id.desc(),
+            )
             .all()
         )
         reconciliation_ids = {row.id for row in reconciliation_rows}
@@ -204,7 +207,7 @@ async def reseller_page(
         total_due = _reconciled_total(db, selected.id)
         total_paid = _paid_total(db, selected.id)
 
-    current_period = datetime.now(APP_TIMEZONE).strftime("%Y-%m")
+    current_date = datetime.now(APP_TIMEZONE).strftime("%Y-%m-%d")
     return templates.TemplateResponse(
         request,
         "reseller_pg.html",
@@ -219,7 +222,7 @@ async def reseller_page(
             "total_due": total_due,
             "total_paid": total_paid,
             "balance_due": max(total_due - total_paid, Decimal("0")),
-            "current_period": current_period,
+            "current_date": current_date,
             "display_timestamp": _display_timestamp,
         },
     )
@@ -335,33 +338,39 @@ async def reconcile_reseller(
     )
     if reseller is None:
         raise HTTPException(status_code=404, detail="Reseller not found")
-    if payload.period > datetime.now(APP_TIMEZONE).strftime("%Y-%m"):
-        raise HTTPException(status_code=422, detail="Cannot reconcile a future month")
-    exists = (
-        db.query(ResellerReconciliations.id)
-        .filter(
-            ResellerReconciliations.reseller_id == reseller.id,
-            ResellerReconciliations.period == payload.period,
-        )
+    reconciliation_date_value = payload.reconciliation_date or (
+        payload.period + "-01" if payload.period else None
+    )
+    if reconciliation_date_value is None:
+        raise HTTPException(status_code=422, detail="A reconciliation date is required")
+
+    try:
+        reconciliation_date = datetime.strptime(
+            reconciliation_date_value, "%Y-%m-%d"
+        ).date()
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid reconciliation date") from None
+
+    today = datetime.now(APP_TIMEZONE).date()
+    if reconciliation_date > today:
+        raise HTTPException(status_code=422, detail="Cannot reconcile on a future date")
+
+    period = reconciliation_date.strftime("%Y-%m")
+    latest_reconciliation = (
+        db.query(ResellerReconciliations)
+        .filter(ResellerReconciliations.reseller_id == reseller.id)
+        .order_by(ResellerReconciliations.reconciliation_date.desc())
         .first()
     )
-    if exists:
-        raise HTTPException(
-            status_code=409,
-            detail="This reseller already has a reconciliation for that month",
+    if latest_reconciliation:
+        latest_date = str(
+            latest_reconciliation.reconciliation_date or latest_reconciliation.period + "-01"
         )
-    latest_period = (
-        db.query(ResellerReconciliations.period)
-        .filter(ResellerReconciliations.reseller_id == reseller.id)
-        .order_by(ResellerReconciliations.period.desc())
-        .limit(1)
-        .scalar()
-    )
-    if latest_period and payload.period <= latest_period:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Reconcile a month later than {latest_period}",
-        )
+        if reconciliation_date_value <= latest_date:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Reconcile on a date later than {latest_date}",
+            )
     allocations = (
         db.query(ResellerAllocations)
         .filter(ResellerAllocations.reseller_id == reseller.id)
@@ -373,11 +382,11 @@ async def reconcile_reseller(
             status_code=409,
             detail="There is no reseller-held stock to reconcile",
         )
-    first_allocation_month = str(allocations[0].created_at or "")[:7]
-    if first_allocation_month and payload.period < first_allocation_month:
+    first_allocation_date = str(allocations[0].created_at or "")[:10]
+    if first_allocation_date and reconciliation_date_value < first_allocation_date:
         raise HTTPException(
             status_code=422,
-            detail="The reconciliation month is before the first stock allocation",
+            detail="The reconciliation date is before the first stock allocation",
         )
     outstanding_lines = (
         db.query(ResellerAllocationLines)
@@ -432,11 +441,11 @@ async def reconcile_reseller(
     total_due = Decimal("0")
     for line_id, (sold, returned) in totals_by_line.items():
         allocation_line, allocation = line_by_id[line_id]
-        allocation_month = str(allocation.created_at or "")[:7]
-        if allocation_month and allocation_month > payload.period:
+        allocation_date = str(allocation.created_at or "")[:10]
+        if allocation_date and allocation_date > reconciliation_date_value:
             raise HTTPException(
                 status_code=422,
-                detail="A reconciliation cannot include stock allocated in a later month",
+                detail="A reconciliation cannot include stock allocated on a later date",
             )
         remaining = decimal_value(
             allocation_line.quantity_remaining,
@@ -456,7 +465,8 @@ async def reconcile_reseller(
     try:
         reconciliation = ResellerReconciliations(
             reseller_id=reseller.id,
-            period=payload.period,
+            period=period,
+            reconciliation_date=reconciliation_date_value,
             total_due=str(money(total_due)),
             reconciled_by=user["id"],
             created_at=timestamp,
@@ -506,7 +516,7 @@ async def reconcile_reseller(
                 )
         db.commit()
         return {
-            "message": "Monthly reconciliation recorded",
+            "message": "Reconciliation recorded",
             "reconciliation_id": reconciliation.id,
             "total_due": str(money(total_due)),
         }

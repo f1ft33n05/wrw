@@ -27,7 +27,10 @@ function priceForQuantity(option, quantity) {
     const lineTotal =
         retailQuantity * (retailQuantity > 0 ? retailPrice : 0)
         + wholesaleQuantity * (wholesaleQuantity > 0 ? wholesalePrice : 0);
-    const roundedLineTotal = Math.round((lineTotal + Number.EPSILON) * 100) / 100;
+    const requestedDiscount = Number(document.querySelector("#item-discount")?.value || option.dataset.discount || 0);
+    const safeDiscount = Number.isFinite(requestedDiscount) ? Math.min(Math.max(requestedDiscount, 0), 100) : 0;
+    const discountedLineTotal = lineTotal * (1 - safeDiscount / 100);
+    const roundedLineTotal = Math.round((discountedLineTotal + Number.EPSILON) * 100) / 100;
     const pricesAreValid =
         Number.isFinite(retailPrice) && retailPrice > 0
         && Number.isFinite(wholesalePrice) && wholesalePrice > 0;
@@ -106,8 +109,18 @@ function renderCart() {
         formatMoney(Math.max(tendered - total, 0));
 }
 
-itemSelection.addEventListener("change", updateSelectedPrice);
+itemSelection.addEventListener("change", async () => {
+    const option = itemSelection.selectedOptions[0];
+    if (option?.value) {
+        try {
+            const response = await fetch(`/items/${option.value}/discount`, { credentials: "same-origin" });
+            if (response.ok) option.dataset.discount = (await response.json()).percentage;
+        } catch {}
+    }
+    updateSelectedPrice();
+});
 quantityInput.addEventListener("input", updateSelectedPrice);
+document.querySelector("#item-discount").addEventListener("input", updateSelectedPrice);
 
 document.querySelector("#add-to-cart").addEventListener("click", () => {
     posError.textContent = "";
@@ -136,7 +149,8 @@ document.querySelector("#add-to-cart").addEventListener("click", () => {
         unitPrices: pricing.unitPrices,
         priceBreakdown: pricing.priceBreakdown,
         lineTotal: pricing.lineTotal,
-    });
+            discountPercentage: Number(document.querySelector("#item-discount").value || option.dataset.discount || 0),
+        });
     renderCart();
 });
 
@@ -170,6 +184,7 @@ posForm.addEventListener("submit", async (event) => {
         items: [...cart.entries()].map(([itemId, line]) => ({
             item_id: Number(itemId),
             quantity: line.quantity,
+            discount_percentage: line.discountPercentage || undefined,
         })),
         amount_paid: amountPaid,
         payment_method: paymentMethod || null,

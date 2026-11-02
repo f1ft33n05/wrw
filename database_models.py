@@ -29,6 +29,16 @@ class Contact(Base):
     created_at = Column(String)
     updated_at = Column(String)
 
+class ItemCategory(Base):
+    __tablename__ = "item_categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+    description = Column(String)
+    created_at = Column(String)
+    updated_at = Column(String)
+
+
 class Item(Base):
     __tablename__ = "items"
 
@@ -42,6 +52,20 @@ class Item(Base):
     wholesale_threshold = Column(String, default="6")
     quantity = Column(String)
     unit = Column(String)
+    category_id = Column(Integer)
+    created_at = Column(String)
+    updated_at = Column(String)
+
+
+class ItemDiscount(Base):
+    __tablename__ = "item_discounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    discount_type = Column(String, nullable=False)  # item or category
+    target_id = Column(Integer, nullable=False)
+    percentage = Column(String, nullable=False)
+    active = Column(Integer, default=1)
     created_at = Column(String)
     updated_at = Column(String)
 
@@ -56,6 +80,8 @@ class SalesTxn(Base):
     unit_price = Column(String)
     price_type = Column(String)
     total_price = Column(String)
+    discount_percentage = Column(String)
+    discount_amount = Column(String)
     payment_method = Column(String)
     added_by = Column(Integer)
     location = Column(String) # e.g., "store", "online", "Event: (name of event)"
@@ -138,13 +164,11 @@ class ResellerAllocationLines(Base):
 
 class ResellerReconciliations(Base):
     __tablename__ = "reseller_reconciliations"
-    __table_args__ = (
-        UniqueConstraint("reseller_id", "period", name="uq_reseller_reconciliation_period"),
-    )
 
     id = Column(Integer, primary_key=True, index=True)
     reseller_id = Column(Integer, nullable=False, index=True)
     period = Column(String, nullable=False)
+    reconciliation_date = Column(String)
     total_due = Column(String, nullable=False)
     reconciled_by = Column(Integer)
     created_at = Column(String)
