@@ -142,7 +142,7 @@ async def get_current_user(
         user = db.query(User).filter(User.id == user_id).first()
         if user is None or user.username != username:
             raise credentials_exception
-        return {"username": user.username, "id": user.id, "role": user.role}
+        return {"username": user.username, "name": user.name, "id": user.id, "role": user.role}
     except JWTError:
         raise credentials_exception
 

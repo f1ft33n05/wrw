@@ -2,7 +2,7 @@
 <body>
   <header>
         <nav>
-            <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/working--.png') }}" alt="We are Wines Logo"></a></div>
+            <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-light.png') }}" alt="We are Wines Logo"></a></div>
             <ul>
                 <li>
                 <details class="dropdown">
@@ -19,12 +19,12 @@
             </ul>
         </nav>
     </header>
-    <div class="container row">
+    <div class="dashboard-container row">
       {% include "sidebar.html" %}
       <main class="col-xs-12 col-md-9 dashboard-content">
         <div class="dashboard-heading">
-          <div>
-            <h1>Welcome, {{ user.username }}</h1>
+          <div class="dashboard-greeting">
+            <h1>Welcome, {{ user.name }}</h1>
             <p>Business performance overview</p>
           </div>
           <form method="get" class="dashboard-date-filter">
@@ -65,6 +65,7 @@
         </section>
       </main>
     </div>
+    {% include "footer.html" %}
     <script id="sales-chart-data" type="application/json">{{ sales_chart | safe }}</script>
     <script src="{{ url_for('static', path='js/dashboard.js') }}"></script>
     <style>
@@ -76,16 +77,12 @@
       .dashboard-date-filter label { margin:0; }
       .dashboard-date-filter input, .dashboard-date-filter button { margin:0; }
       .metric-grid { display:grid; gap:.75rem; grid-template-columns:repeat(4, minmax(0, 1fr)); margin-bottom:1rem; }
-      .metric-card { align-items:center; background:#fff; border:1px solid #dfe3e8; border-radius:.55rem; box-shadow:0 2px 8px rgba(32,40,50,.08); color:#202428; display:flex; justify-content:space-between; min-height:96px; padding:.8rem 1rem; }
       .metric-card div { display:flex; flex-direction:column; }
       .metric-label { font-size:.72rem; font-weight:700; margin-bottom:.35rem; }
-      .metric-card strong { font-size:1rem; white-space:nowrap; }
       .metric-icon { align-items:center; border-radius:50%; display:flex; height:38px; justify-content:center; width:38px; font-size:1.25rem; background:#eef1f4; color:#4c5967; }
       .metric-icon.due { color:#f0a22d; } .metric-icon.return { color:#e35d6a; }
       .metric-icon.purchase { color:#00a878; } .metric-icon.warning { color:#df8b17; }
       .metric-icon.purchase-return, .metric-icon.expense { color:#e35d6a; }
-      .dashboard-chart-card { border:1px solid #dfe3e8; border-radius:.55rem; min-height:400px; padding:1rem; background:#fff; box-shadow:0 2px 8px rgba(32,40,50,.08); color:#202428; }
-      .dashboard-chart-card header h2 { font-size:.95rem; margin:0 0 .75rem; }
       #sales-chart { display:block; height:330px; width:100%; }
       @media (max-width: 1100px) { .metric-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
       @media (max-width: 700px) {

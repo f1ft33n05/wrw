@@ -1,11 +1,8 @@
 {% include "header.html" %}
 <body>
-  <div class="container row">
-    {% include "sidebar.html" %}
-    <div class="col-xs-12 col-md-9">
-  <header>
+  <!-- <header>
     <nav>
-      <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="We are Wines"></a></div>
+      <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-light.png') }}" alt="We are Wines"></a></div>
       <ul>
         <li><a href="/customers">Customers</a></li>
         <li><a href="/suppliers">Suppliers</a></li>
@@ -14,79 +11,113 @@
         {% if contact_type == "reseller" and user.role in ["admin", "manager"] %}<li><a href="/reseller_pg">Consignment</a></li>{% endif %}
       </ul>
     </nav>
-  </header>
-  <main class="container">
-    <h1>{{ contact_type|title }} contacts</h1>
-    {% if user.role in ["admin", "manager"] %}
-    <details>
-      <summary>Add {{ contact_type }}</summary>
-      <form id="contact-create-form" data-contact-type="{{ contact_type }}">
-        <label>Name <input name="name" required></label>
-        <label>Email <input type="email" name="email"></label>
-        <label>Phone <input name="phone"></label>
-        <label>Address <input name="address"></label>
-        <p id="contact-error" role="alert"></p>
-        <button type="submit">Add {{ contact_type }}</button>
-      </form>
-    </details>
-    {% endif %}
-    <table class="striped">
-      <thead>
-        <tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Outstanding balance</th>{% if user.role in ["admin", "manager"] %}<th>Actions</th>{% endif %}</tr>
-      </thead>
-      <tbody>
-        {% for contact in contacts %}
-        <tr>
-          <td>{{ contact.name }}</td>
-          <td>{{ contact.email or "—" }}</td>
-          <td>{{ contact.phone or "—" }}</td>
-          <td>{{ contact.address or "—" }}</td>
-          <td>{{ contact_balances[contact.id]|money }}</td>
+  </header> -->
+      <header>
+        <nav>
+            <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-light.png') }}" alt="We are Wines Logo"></a></div>
+            <ul>
+                <li>
+                <details class="dropdown">
+                    <summary id="user-avatar">
+                      <img src="{{ url_for('static', path='images/user-avatar.png') }}" alt="We are Wines Logo">
+                    </summary>
+                    <ul dir="rtl">
+                    <li><a href="#">Profile</a></li>
+                    <li><a href="#">Settings</a></li>
+                    <li><a href="#">Logout</a></li>
+                    </ul>
+                </details>
+                </li>
+            </ul>
+        </nav>
+    </header>
+  <div class="content-container row">
+    {% include "sidebar.html" %}
+    <main class="contcts col-xs-12 col-md-9">
+          <h1>{{ contact_type|title }}s</h1>
           {% if user.role in ["admin", "manager"] %}
-          <td>
-            {% if contact_type == "reseller" %}
-            <a role="button" class="secondary" href="/resellers/{{ contact.id }}/statement">Statement</a>
-            {% endif %}
-            {% if contact_type == "supplier" %}
-            <a role="button" class="secondary" href="/suppliers/{{ contact.id }}/statement">Statement</a>
-            {% endif %}
-            <button type="button" data-edit-contact
-              data-contact-id="{{ contact.id }}"
-              data-contact-name="{{ contact.name }}"
-              data-contact-email="{{ contact.email or '' }}"
-              data-contact-phone="{{ contact.phone or '' }}"
-              data-contact-address="{{ contact.address or '' }}">Edit</button>
-            <button type="button" class="pico-background-red-700" data-delete-contact
-              data-contact-id="{{ contact.id }}"
-              data-contact-name="{{ contact.name }}">Delete</button>
-          </td>
+          <details>
+            <summary>Add +</summary>
+            <form id="contact-create-form" data-contact-type="{{ contact_type }}">
+              <div class="names row">
+                <label class="col-xs-12 col-md-6">Name <input name="name" required></label>
+                <label class="col-xs-12 col-md-6">Email <input type="email" name="email"></label>
+              </div>
+              <div class="contact-info row">
+                <label class="col-xs-12 col-md-6">Phone <input name="phone"></label>
+                <label class="col-xs-12 col-md-6">Address <input name="address"></label>
+              </div>
+              <p id="contact-error" role="alert"></p>
+              <button type="submit">Add {{ contact_type }}</button>
+            </form>
+          </details>
           {% endif %}
-        </tr>
-        {% else %}
-        <tr><td colspan="{% if user.role in ['admin', 'manager'] %}6{% else %}5{% endif %}">No {{ contact_type }} contacts found.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <small>{{ contacts|length }} {{ contact_type }} contact{% if contacts|length != 1 %}s{% endif %}</small>
-    {% if user.role in ["admin", "manager"] %}
-    <dialog id="contact-edit-dialog">
-      <article>
-        <h2>Edit {{ contact_type }}</h2>
-        <form id="contact-edit-form">
-          <label>Name <input name="name" required></label>
-          <label>Email <input type="email" name="email"></label>
-          <label>Phone <input name="phone"></label>
-          <label>Address <input name="address"></label>
-          <p id="contact-edit-error" role="alert"></p>
-          <footer>
-            <button type="button" class="secondary" data-cancel-contact-edit>Cancel</button>
-            <button type="submit">Save contact</button>
-          </footer>
-        </form>
-      </article>
-    </dialog>
-    {% endif %}
-  </main>
+          <table class="striped">
+            <thead>
+              <tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>Outstanding balance</th>{% if user.role in ["admin", "manager"] %}<th>Actions</th>{% endif %}</tr>
+            </thead>
+            <tbody>
+              {% for contact in contacts %}
+              <tr>
+                <td>{{ contact.name }}</td>
+                <td>{{ contact.email or "—" }}</td>
+                <td>{{ contact.phone or "—" }}</td>
+                <td>{{ contact.address or "—" }}</td>
+                <td>{{ contact_balances[contact.id]|money }}</td>
+                {% if user.role in ["admin", "manager"] %}
+                <td>
+                  {% if contact_type == "reseller" %}
+                  <a role="button" class="secondary" href="/resellers/{{ contact.id }}/statement">Statement</a>
+                  {% endif %}
+                  {% if contact_type == "supplier" %}
+                  <a role="button" class="secondary" href="/suppliers/{{ contact.id }}/statement">Statement</a>
+                  {% endif %}
+                  <button type="button" data-edit-contact
+                    data-contact-id="{{ contact.id }}"
+                    data-contact-name="{{ contact.name }}"
+                    data-contact-email="{{ contact.email or '' }}"
+                    data-contact-phone="{{ contact.phone or '' }}"
+                    data-contact-address="{{ contact.address or '' }}">Edit</button>
+                  <button type="button" class="pico-background-red-700" data-delete-contact
+                    data-contact-id="{{ contact.id }}"
+                    data-contact-name="{{ contact.name }}">Delete</button>
+                </td>
+                {% endif %}
+              </tr>
+              {% else %}
+              <tr><td colspan="{% if user.role in ['admin', 'manager'] %}6{% else %}5{% endif %}">No {{ contact_type }} contacts found.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% if user.role in ["admin", "manager"] %}
+          <dialog id="contact-edit-dialog">
+            <article>
+              <h2>Edit {{ contact_type }}</h2>
+              <form id="contact-edit-form">
+                <div class="names row">
+                  <label class="col-xs-12 col-md-5">Name <input name="name" required></label>
+                  <div class="spacer col-xs-12 col-md-2"></div>
+                  <label class="col-xs-12 col-md-5">Email <input type="email" name="email"></label>
+                </div>
+                <div class="contact-info row">
+                  <label class="col-xs-12 col-md-5">Phone <input name="phone"></label>
+                  <div class="spacer col-xs-12 col-md-2"></div>
+                  <label class="col-xs-12 col-md-5">Address <input name="address"></label>
+                </div>
+                <p id="contact-edit-error" role="alert"></p>
+                <footer class="row">
+                  <button type="button" class="secondary col-xs-12 col-md-2" data-cancel-contact-edit>Cancel</button>
+                  <div class="spacer col-xs-12 col-md-1"></div>
+                  <button type="submit" class="col-xs-12 col-md-2">Save</button>
+                  <div class="spacer col-xs-12 col-md-7"></div>
+                  
+                </footer>
+              </form>
+            </article>
+          </dialog>
+          {% endif %}
+    </main>
+  </div>
   <script src="{{ url_for('static', path='js/contacts.js') }}"></script>
   </div>
   </div>

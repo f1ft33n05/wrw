@@ -2,7 +2,7 @@
 <body>
     <header>
         <nav>
-            <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/working--.png') }}" alt="We are Wines Logo"></a></div>
+            <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-light.png') }}" alt="We are Wines Logo"></a></div>
             <ul>
                 <li>
                 <details class="dropdown">
@@ -19,15 +19,16 @@
             </ul>
         </nav>
     </header>
-    <div class="container row">
+    <div class="content-container row">
       {% include "sidebar.html" %}
       <main class="col-xs-12 col-md-9">
         <article class="all-users-container">
             <header class="row">
-                <section class="title">
-                    <h1>Users</h1>&nbsp;&bull;&nbsp;<span>All users</span>
+                <section class="title col-xs-12 col-md-3">
+                    <h1>All Users</h1>
                 </section>
-                <button class="secondary" type="button" data-add-user>Add</button>
+                <span class="spacer col-xs-12 col-md-7"></span>
+                <button class="primary col-xs-12 col-md-2" type="button" data-add-user>Add</button>
             </header>
             <table class="striped">
                 <thead>
@@ -77,44 +78,54 @@
                     {% endfor %}
                 </tbody>
             </table>
-            <small id="user-count">{{ users|length }} user{% if users|length != 1 %}s{% endif %}</small>
         </article>
         <dialog id="user-create-dialog">
             <article>
-                <h2>Add user</h2>
+                <h2>Add User</h2>
                 <form id="user-create-form">
-                    <label>
-                        Name
-                        <input type="text" name="name" autocomplete="name" required>
-                    </label>
-                    <label>
-                        Username
-                        <input type="text" name="username" autocomplete="username" required>
-                    </label>
-                    <label>
-                        Email
-                        <input type="email" name="email" autocomplete="email" required>
-                    </label>
-                    <label>
-                        Phone
-                        <input type="tel" name="phone" autocomplete="tel" required>
-                    </label>
-                    <label>
-                        Role
-                        <select name="role" required>
-                            {% for role in roles %}
-                            <option value="{{ role.name }}">{{ role.name|title }}</option>
-                            {% endfor %}
-                        </select>
-                    </label>
-                    <label>
-                        Password
-                        <input type="password" name="password" autocomplete="new-password" required>
-                    </label>
+                    <div class="names row">
+                        <label class="col-xs-12 col-md-5">
+                            Name
+                            <input type="text" name="name" autocomplete="name" required>
+                        </label>
+                        <div class="spacer col-xs-12 col-md-2"></div>
+                        <label class="col-xs-12 col-md-5">
+                            Username
+                            <input type="text" name="username" autocomplete="username" required>
+                        </label>
+                    </div>
+                    <div class="contacts row">
+                        <label class="col-xs-12 col-md-5">
+                            Email
+                            <input type="email" name="email" autocomplete="email" required>
+                        </label>
+                        <div class="spacer col-xs-12 col-md-2"></div>
+                        <label class="col-xs-12 col-md-5">
+                            Phone
+                            <input type="tel" name="phone" autocomplete="tel" required>
+                        </label>
+                    </div>
+                    <div class="auth-details row">
+                        <label class="col-xs-12 col-md-5">
+                            Role
+                            <select name="role" required>
+                                {% for role in roles %}
+                                <option value="{{ role.name }}">{{ role.name|title }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <div class="spacer col-xs-12 col-md-2"></div>
+                        <label class="col-xs-12 col-md-5">
+                            Password
+                            <input type="password" name="password" autocomplete="new-password" required>
+                        </label>
+                    </div>
                     <p id="create-user-error" role="alert"></p>
-                    <footer>
-                        <button class="secondary" type="button" data-cancel-create-user>Cancel</button>
-                        <button type="submit" id="create-user-submit">Create user</button>
+                    <footer class="row">
+                        <button class="secondary col-xs-12 col-md-2" type="button" data-cancel-create-user>Cancel</button>
+                        <div class="spacer col-xs-12 col-md-1"></div>
+                        <button type="submit" id="create-user-submit" class="col-xs-12 col-md-2">Create User</button>
+                        <div class="spacer col-xs-12 col-md-7"></div>
                     </footer>
                 </form>
             </article>
@@ -124,9 +135,11 @@
                 <h2>Delete user</h2>
                 <p>Are you sure you want to delete <strong id="delete-user-name"></strong>?</p>
                 <p id="delete-user-error" role="alert"></p>
-                <footer>
-                    <button class="secondary" type="button" data-cancel-delete>Cancel</button>
-                    <button type="button" class="pico-background-red-700" id="confirm-delete-user">Confirm delete</button>
+                <footer class="row">
+                    <div class="spacer col-xs-12 col-md-6"></div>
+                    <button class="secondary col-xs-12 col-md-2" type="button" data-cancel-delete>Cancel</button>
+                    <div class="spacer col-xs-12 col-md-1"></div>
+                    <button type="submit" id="confirm-delete-user" class="col-xs-12 col-md-2">Confirm</button>
                 </footer>
             </article>
         </dialog>
@@ -134,39 +147,50 @@
             <article>
                 <h2>Edit user</h2>
                 <form id="user-edit-form">
-                    <label>
-                        Name
-                        <input type="text" name="name" required>
-                    </label>
-                    <label>
-                        Username
-                        <input type="text" name="username" required>
-                    </label>
-                    <label>
-                        Email
-                        <input type="email" name="email" required>
-                    </label>
-                    <label>
-                        Phone
-                        <input type="tel" name="phone" required>
-                    </label>
-                    <label>
-                        Role
-                        <select name="role" required>
-                            {% for role in roles %}
-                            <option value="{{ role.name }}">{{ role.name|title }}</option>
-                            {% endfor %}
-                        </select>
-                    </label>
-                    <label>
-                        New password
-                        <input type="password" name="password" autocomplete="new-password">
-                    </label>
-                    <small>Leave the password blank to keep the current password.</small>
+                    <div class="names row">
+                        <label class="col-xs-12 col-md-5">
+                            Name
+                            <input type="text" name="name" autocomplete="name" required>
+                        </label>
+                        <div class="spacer col-xs-12 col-md-2"></div>
+                        <label class="col-xs-12 col-md-5">
+                            Username
+                            <input type="text" name="username" autocomplete="username" required>
+                        </label>
+                    </div>
+                    <div class="contacts row">
+                        <label class="col-xs-12 col-md-5">
+                            Email
+                            <input type="email" name="email" autocomplete="email" required>
+                        </label>
+                        <div class="spacer col-xs-12 col-md-2"></div>
+                        <label class="col-xs-12 col-md-5">
+                            Phone
+                            <input type="tel" name="phone" autocomplete="tel" required>
+                        </label>
+                    </div>
+                                        <div class="auth-details row">
+                        <label class="col-xs-12 col-md-5">
+                            Role
+                            <select name="role" required>
+                                {% for role in roles %}
+                                <option value="{{ role.name }}">{{ role.name|title }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <div class="spacer col-xs-12 col-md-2"></div>
+                        <label class="col-xs-12 col-md-5">
+                            New Password
+                            <input type="password" name="password" autocomplete="new-password" required>
+                        </label>
+                        <small>Leave the password blank to keep the current password.</small>
+                    </div>
                     <p id="edit-user-error" role="alert"></p>
-                    <footer>
-                        <button class="secondary" type="button" data-cancel-edit>Cancel</button>
-                        <button type="submit" id="save-user-changes">Save changes</button>
+                    <footer class="row">
+                        <button class="secondary col-xs-12 col-md-2" type="button" data-cancel-edit>Cancel</button>
+                        <div class="spacer col-xs-12 col-md-1"></div>
+                        <button type="submit" id="save-user-changes" class="col-xs-12 col-md-2">Save</button>
+                        <div class="spacer col-xs-12 col-md-7"></div>
                     </footer>
                 </form>
             </article>

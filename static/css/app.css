@@ -3,8 +3,6 @@ html {
 }
 
 body {
-    height: 100vh;
-    width: 100%;
     font-size: 1.8rem;
 }
 
@@ -46,12 +44,11 @@ details.dropdown>summary+ul {
     height: 5rem;
 }
 
-.container {
+.content-container {
     display: flex;
     justify-content: center;
-    width: 100%;
+    width: 80%;
     margin: auto;
-    padding: 5rem auto 0;
 }
 
 
@@ -87,4 +84,162 @@ details.dropdown>summary+ul {
 #reseller_pg_content {
     width: 80%;
     margin: 3rem auto;
+}
+
+.authentication-content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 80%;
+    margin: auto;
+    height: 85vh;
+}
+
+.authentication-content input {
+    line-height: 3rem;
+    padding: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 1.8rem;
+}
+
+.authentication-content button {
+    line-height: 2.5rem;
+    padding: 0.5rem;
+    margin-top: 3rem;
+    font-size: 1.8rem;
+}
+
+.footer-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 5rem;
+    padding: 2rem;
+    margin-top: 3rem;
+}
+
+/* DASHBOARD HOME */
+.dashboard-container {
+    display: flex;
+    justify-content: center;
+    width: 80%;
+    margin: auto;
+}
+
+.metric-card { 
+    align-items:center; 
+    background:transparent;
+    border:1px solid #fff;
+    border-radius:0.5rem; 
+    box-shadow:0 2px 8px rgba(32,40,50,.08); 
+    color:#fff; 
+    display:flex; 
+    justify-content:space-between; 
+    min-height:96px; 
+    padding:.8rem 1rem; 
+}
+
+.metric-card .metric-label {
+    font-size: 1.6rem;
+}
+
+.metric-card strong {
+    font-size: 1.4rem;
+}
+
+.dashboard-greeting {
+    margin-bottom: 2rem;
+
+}
+
+.dashboard-greeting h1 {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+}
+
+.dashboard-date-filter input, .dashboard-date-filter button {
+    line-height: 2.5rem;
+    padding: 0.5rem;
+    margin-top: 1rem;
+    font-size: 1.6rem;
+}
+
+.dashboard-chart-card {
+    background: transparent;
+    border:1px solid #fff;
+    border-radius:0.5rem; 
+    box-shadow:0 2px 8px rgba(32,40,50,.08); 
+    color:#fff; 
+    min-height:96px; 
+    padding:.8rem 1rem; 
+}
+
+.dashboard-chart-card header h2 { 
+    font-size:.95rem; 
+    margin:0 0 .75rem;
+    
+}
+
+/* USERS */
+
+.all-users-container button, .all-users-container input {
+    font-size: 1.5rem;
+}
+
+#user-create-dialog article, #user-edit-dialog article, #user-delete-dialog article, #contact-create-dialog article, #contact-edit-dialog article, #contact-delete-dialog article{
+    padding: 4rem;
+}
+
+#user-create-dialog article h2, #user-edit-dialog article h2, #user-delete-dialog article h2, #contact-create-dialog article h2, #contact-edit-dialog article h2, #contact-delete-dialog article h2{
+    font-size: 2.4rem;
+    margin-bottom: 2rem;
+}
+
+#user-create-dialog footer, #user-edit-dialog footer, #user-delete-dialog footer, #contact-create-dialog footer, #contact-edit-dialog footer, #contact-delete-dialog footer{
+    margin-top: 2rem;
+}
+
+#user-create-dialog footer button, #user-edit-dialog footer button , #user-delete-dialog footer button, #contact-create-dialog footer button, #contact-edit-dialog footer button, #contact-delete-dialog footer button{
+    font-size: 1.5rem;
+}
+
+/* CONTACTS */
+.contcts h1 {
+    font-size: 2.4rem;
+    margin-bottom: 4rem;
+}
+.contcts summary {
+    width: fit-content;
+    background-color: var(--pico-primary);
+    color: #fff;
+    padding: 1.5rem 2rem;
+    border-radius: 0.5rem;
+    margin-bottom: 2rem;
+}
+.contcts summary::after {
+    display : none;
+}
+
+#contact-create-form {
+    margin-top: 2rem;
+}
+
+#contact-create-form button{
+    width: 50%;
+    font-size: 1.6rem;
+}
+
+#contact-create-form input {
+    font-size: 1.6rem;
+}
+
+/* SIDEBAR */
+
+aside {
+    margin-right: 2rem;
+}
+
+aside details ul {
+    padding-left: 3rem;
+    font-size: 1.6rem;
 }
