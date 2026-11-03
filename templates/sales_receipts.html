@@ -1,0 +1,23 @@
+{% include "header.html" %}
+<body>
+<div class="container row">
+  {% include "sidebar.html" %}
+  <div class="col-xs-12 col-md-9">
+  {% include "sales_navigation.html" ignore missing %}
+  <main class="container">
+    <header><h1>Receipts</h1><a role="button" href="/sales/payments">Payments</a></header>
+    <table class="striped">
+      <thead><tr><th>Receipt / Invoice</th><th>Customer</th><th>Date</th><th>Total</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for receipt in receipts %}
+        <tr><td>{{ receipt.document_number }}</td><td>{{ receipt.customer }}</td><td>{{ receipt.created_at }}</td><td>{{ receipt.total|money }}</td><td><a href="{{ receipt.receipt_url }}">View receipt</a></td></tr>
+        {% else %}
+        <tr><td colspan="5">No receipts found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </main>
+</div>
+</div>
+</body>
+</html>

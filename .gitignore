@@ -2,3 +2,6 @@
 /__pycache
 /.vscode
 /.venv
+.pytest_cache/
+*.py[cod]
+coverage/

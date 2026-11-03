@@ -1,6 +1,8 @@
 {% include "header.html" %}
 <body>
-  <main class="container">
+  <div class="container row">
+    {% include "sidebar.html" %}
+    <main class="col-xs-12 col-md-9">
     <nav><ul><li><strong>{{ document_type|title }}s</strong></li></ul><ul><li><a href="/dashboard">Dashboard</a></li><li>{{ user.username }}</li></ul></nav>
     <details open>
       <summary>Create {{ document_type }}</summary>
@@ -61,6 +63,8 @@
       </tbody>
     </table>
   </main>
+  </div>
+  </div>
   <script src="{{ url_for('static', path='js/documents.js') }}"></script>
 </body>
 </html>

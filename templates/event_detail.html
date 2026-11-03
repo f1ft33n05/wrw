@@ -1,6 +1,8 @@
 {% include "header.html" %}
 <body>
-  <main class="container">
+  <div class="container row">
+    {% include "sidebar.html" %}
+    <main class="col-xs-12 col-md-9">
     <nav><ul><li><strong>{{ event.name }}</strong></li></ul><ul><li><a href="/events">All events</a></li><li><a href="/sales/pos?event_id={{ event.id }}">Open POS</a></li></ul></nav>
     <section>
       <p>{% if event.venue %}Venue: {{ event.venue }} · {% endif %}Status: {{ event.status|title }}</p>
@@ -24,5 +26,6 @@
       </tbody>
     </table>
   </main>
-</body>
+  </div>
+  </body>
 </html>

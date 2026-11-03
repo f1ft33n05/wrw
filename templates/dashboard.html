@@ -20,87 +20,79 @@
         </nav>
     </header>
     <div class="container row">
-      <aside class="col-xs-12 col-md-2">
-        <nav>
-          <ul>
-            <li><a href="/dashboard">Home</a></li>
-            {% if user.role in ["admin", "manager"] %}
-              <li>
-                <details name="sell">
-                  <summary>Users</summary>
-                  <ul>
-                    <li><a href="/users">All Users</a></li>
-                    <li><a href="/roles">Roles</a></li>
-                  </ul>
-                </details>
-              </li>
-            {% endif %}
-            <li>
-              <details name="sell">
-                <summary>Contacts</summary>
-                <ul>
-                  <li><a href="/suppliers">Suppliers</a></li>
-                  <li><a href="/customers">Customers</a></li>
-                  <li><a href="/resellers">Resellers</a></li>
-                </ul>
-              </details>
-            </li>
-            <li>
-              <details name="sell">
-                <summary>Items</summary>
-                <ul>
-                  <li><a href="/items">List Items</a></li>
-                  <li><a href="/items#import-item">Add Item</a></li>
-                  <li><a href="/items/import/page">Import Items</a></li>
-                  <li><a href="/items/categories/manage">Categories</a></li>
-                  <li><a href="/items/categories/manage#discounts">Discounts</a></li>
-                </ul>
-              </details>
-            </li>
-            <li>
-              <details name="sell">
-                <summary>Sell</summary>
-                <ul>
-                  <li><a href="/sales/list">All Sales</a></li>
-                  <li><a href="/sales/pos">POS</a></li>
-                  <li><a href="/events">Events</a></li>
-                  {% if user.role in ["admin", "manager"] %}
-                  <li><a href="/reseller_pg">Reseller</a></li>
-                  {% endif %}
-                </ul>
-              </details>
-            </li>
-            <li><a href="/sales/list">Receipts and payments</a></li>
-            <li><a href="/quotations">Quotes</a></li>
-            <li><a href="/invoices">Invoices</a></li>
-            {% if user.role in ["admin", "manager"] %}
-            <li><a href="/purchases">Purchases</a></li>
-            {% endif %}
-            <li><a href="/inventory">Inventory</a></li>
-            <li>
-              <details name="sell">
-                <summary>Reports</summary>
-                <ul>
-                  <li><a href="/reports">All Reports</a></li>
-                  <li><a href="/sales_report">Sales Report</a></li>
-                  <li><a href="/stock_report">Stock Report</a></li>
-                  <li><a href="/purchase_sale_report">Purchase & Sale Report</a></li>
-                </ul>
-              </details>
-            </li>
-            <li>
-              <form action="/auth/logout" method="post">
-                <button type="submit" class="logout-link">Log out</button>
-              </form>
-            </li>
-          </ul>
-        </nav>
+      {% include "sidebar.html" %}
+      <main class="col-xs-12 col-md-9 dashboard-content">
+        <div class="dashboard-heading">
+          <div>
+            <h1>Welcome, {{ user.username }}</h1>
+            <p>Business performance overview</p>
+          </div>
+          <form method="get" class="dashboard-date-filter">
+            <label>From <input type="date" name="date_from" value="{{ date_from }}"></label>
+            <label>To <input type="date" name="date_to" value="{{ date_to }}"></label>
+            <button type="submit">Filter</button>
+          </form>
+        </div>
 
-      </aside>
-      <main class="col-xs-12 col-md-9">
-        <h1>Dashboard</h1>
-        <p>Welcome to the dashboard! Here you can manage your customers, suppliers, resellers, and items.</p>
+        <section class="metric-grid">
+          <article class="metric-card">
+            <div><span class="metric-label">TOTAL SALES</span><strong>MWK {{ "{:,.2f}".format(metrics.total_sales) }}</strong></div>
+            <span class="metric-icon sales">&#x25A3;</span>
+          </article>
+          <article class="metric-card">
+            <div><span class="metric-label">NET SALES</span><strong>MWK {{ "{:,.2f}".format(metrics.net_sales) }}</strong></div>
+            <span class="metric-icon net">&#36;</span>
+          </article>
+          <article class="metric-card">
+            <div><span class="metric-label">INVOICE DUE</span><strong>MWK {{ "{:,.2f}".format(metrics.invoice_due) }}</strong></div>
+            <span class="metric-icon due">&#9633;</span>
+          </article>
+          <article class="metric-card">
+            <div><span class="metric-label">TOTAL PURCHASE</span><strong>MWK {{ "{:,.2f}".format(metrics.total_purchases) }}</strong></div>
+            <span class="metric-icon purchase">&#8595;</span>
+          </article>
+          <article class="metric-card">
+            <div><span class="metric-label">PURCHASE DUE</span><strong>MWK {{ "{:,.2f}".format(metrics.purchase_due) }}</strong></div>
+            <span class="metric-icon warning">&#9888;</span>
+          </article>
+        </section>
+
+        <section class="dashboard-chart-card">
+          <header>
+            <h2>&#9651; &nbsp; Sales ({{ date_from }} - {{ date_to }})</h2>
+          </header>
+          <canvas id="sales-chart" aria-label="Sales trend chart"></canvas>
+        </section>
       </main>
     </div>
+    <script id="sales-chart-data" type="application/json">{{ sales_chart | safe }}</script>
+    <script src="{{ url_for('static', path='js/dashboard.js') }}"></script>
+    <style>
+      .dashboard-content { padding-bottom: 2rem; }
+      .dashboard-heading { align-items: flex-start; display:flex; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+      .dashboard-heading h1 { margin-bottom:.15rem; }
+      .dashboard-heading p { margin:0; opacity:.7; }
+      .dashboard-date-filter { align-items:flex-end; display:flex; gap:.6rem; }
+      .dashboard-date-filter label { margin:0; }
+      .dashboard-date-filter input, .dashboard-date-filter button { margin:0; }
+      .metric-grid { display:grid; gap:.75rem; grid-template-columns:repeat(4, minmax(0, 1fr)); margin-bottom:1rem; }
+      .metric-card { align-items:center; background:#fff; border:1px solid #dfe3e8; border-radius:.55rem; box-shadow:0 2px 8px rgba(32,40,50,.08); color:#202428; display:flex; justify-content:space-between; min-height:96px; padding:.8rem 1rem; }
+      .metric-card div { display:flex; flex-direction:column; }
+      .metric-label { font-size:.72rem; font-weight:700; margin-bottom:.35rem; }
+      .metric-card strong { font-size:1rem; white-space:nowrap; }
+      .metric-icon { align-items:center; border-radius:50%; display:flex; height:38px; justify-content:center; width:38px; font-size:1.25rem; background:#eef1f4; color:#4c5967; }
+      .metric-icon.due { color:#f0a22d; } .metric-icon.return { color:#e35d6a; }
+      .metric-icon.purchase { color:#00a878; } .metric-icon.warning { color:#df8b17; }
+      .metric-icon.purchase-return, .metric-icon.expense { color:#e35d6a; }
+      .dashboard-chart-card { border:1px solid #dfe3e8; border-radius:.55rem; min-height:400px; padding:1rem; background:#fff; box-shadow:0 2px 8px rgba(32,40,50,.08); color:#202428; }
+      .dashboard-chart-card header h2 { font-size:.95rem; margin:0 0 .75rem; }
+      #sales-chart { display:block; height:330px; width:100%; }
+      @media (max-width: 1100px) { .metric-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+      @media (max-width: 700px) {
+        .dashboard-heading, .dashboard-date-filter { align-items:stretch; flex-direction:column; }
+        .metric-grid { grid-template-columns:1fr; }
+        #sales-chart { height:280px; }
+      }
+    </style>
 </body>
 </html>

@@ -1,5 +1,8 @@
 {% include "header.html" %}
 <body>
+  <div class="container row">
+    {% include "sidebar.html" %}
+    <div class="col-xs-12 col-md-9">
   <header>
     <nav>
       <ul><li><strong>Supplier purchases</strong></li></ul>
@@ -103,5 +106,7 @@
     </tr>
   </template>
   <script src="{{ url_for('static', path='js/purchases.js') }}"></script>
+</div>
+</div>
 </body>
 </html>

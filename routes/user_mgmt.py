@@ -1,16 +1,16 @@
 
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, Request
 from passlib.context import CryptContext
-from database_models import User
+from database_models import RoleDefinition, RolePermission, User
 from database import db_dependency
 from starlette import status
 from models import CreateUserRequest, Role, UpdateUserRequest, UserResponse
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from routes.auth import RoleChecker, get_current_user
 from typing import Annotated
+from config import APP_TIMEZONE as CONFIGURED_TIMEZONE
 
 
 
@@ -22,7 +22,7 @@ router = APIRouter(
 templates = Jinja2Templates(directory="templates")
 user_dependency = Annotated[dict, Depends(get_current_user)]
 
-APP_TIMEZONE = ZoneInfo("Africa/Harare")
+APP_TIMEZONE = CONFIGURED_TIMEZONE
 
 def serialize_timestamp(value: datetime | str | None) -> str | None:
     if value is None:
@@ -60,14 +60,15 @@ def user_response(user: User) -> UserResponse:
 )
 async def list_users(request: Request, user: user_dependency, db: db_dependency):
     users = db.query(User).all()
+    roles = db.query(RoleDefinition).order_by(RoleDefinition.name).all()
     return templates.TemplateResponse(
         request,
         "user_mgmt.html",
         {
             "user": user,
             "users": users,
-            "roles": list(Role) if user["role"] == Role.admin.value else [
-                role for role in Role if role is not Role.admin
+            "roles": roles if user["role"] == Role.admin.value else [
+                role for role in roles if role.name != Role.admin.value
             ],
         },
     )
@@ -84,7 +85,9 @@ async def create_user(
     create_user_request: CreateUserRequest,
     current_user: user_dependency,
 ):
-    if current_user["role"] == Role.manager.value and create_user_request.role is Role.admin:
+    if not db.query(RoleDefinition).filter(RoleDefinition.name == create_user_request.role).first():
+        raise HTTPException(status_code=422, detail="Unknown role")
+    if current_user["role"] == Role.manager.value and create_user_request.role == Role.admin.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Managers cannot create admin accounts",
@@ -96,7 +99,7 @@ async def create_user(
         password = bcrypt_context.hash(create_user_request.password),
         email = create_user_request.email,
         phone = create_user_request.phone,
-        role = create_user_request.role.value,
+        role = create_user_request.role.strip().lower(),
         created_at = datetime.now(timezone.utc),
         updated_at = datetime.now(timezone.utc)
     )
@@ -133,7 +136,7 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     if current_user["role"] == Role.manager.value and (
-        user.role == Role.admin.value or update_user_request.role is Role.admin
+        user.role == Role.admin.value or update_user_request.role == Role.admin.value
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -141,7 +144,7 @@ async def update_user(
         )
     if (
         user.role == Role.admin.value
-        and update_user_request.role is not Role.admin
+        and update_user_request.role != Role.admin.value
         and db.query(User).filter(User.role == Role.admin.value).count() <= 1
     ):
         raise HTTPException(
@@ -153,7 +156,9 @@ async def update_user(
     user.username = update_user_request.username
     user.email = update_user_request.email
     user.phone = update_user_request.phone
-    user.role = update_user_request.role.value
+    if not db.query(RoleDefinition).filter(RoleDefinition.name == update_user_request.role).first():
+        raise HTTPException(status_code=422, detail="Unknown role")
+    user.role = update_user_request.role
     if update_user_request.password:
         user.password = bcrypt_context.hash(update_user_request.password)
     user.updated_at = datetime.now(timezone.utc)

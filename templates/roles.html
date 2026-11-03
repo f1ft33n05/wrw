@@ -1,0 +1,84 @@
+{% include "header.html" %}
+<body>
+  <header><nav><div class="logo"><a href="/"><img src="{{ url_for('static', path='images/working---edited.png') }}" alt="Logo"></a></div><ul><li>{{ user.username }}</li></ul></nav></header>
+  <div class="container row">
+    {% include "sidebar.html" %}
+    <main class="col-xs-12 col-md-10">
+      <article>
+        <header class="row"><section class="title"><h1>Roles</h1>&nbsp;&bull;&nbsp;<span>Module permissions</span></section><button type="button" id="add-role">Add role</button></header>
+        <table>
+          <thead><tr><th>Role</th><th>Description</th><th>Modules</th><th>Users</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for role in roles %}
+            <tr>
+              <td><strong>{{ role.name|title }}</strong>{% if role.system_role %}<br><small>System role</small>{% endif %}</td>
+              <td>{{ role.description or "-" }}</td>
+              <td>{{ permissions_by_role.get(role.name, {})|length }}</td>
+              <td>{{ role_user_counts.get(role.name, 0) if role_user_counts else 0 }}</td>
+              <td><button type="button" data-edit-role="{{ role.id }}" data-role-name="{{ role.name }}" data-role-description="{{ role.description or '' }}" {% if role.system_role %}class="secondary"{% endif %}>Configure</button>{% if not role.system_role %}<button type="button" class="pico-background-red-700" data-delete-role="{{ role.id }}" data-role-name="{{ role.name }}">Delete</button>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </article>
+    </main>
+  </div>
+
+  <dialog id="role-dialog"><article><h2 id="role-dialog-title">Add role</h2>
+    <form id="role-form">
+      <input type="hidden" name="role_id">
+      <label>Name<input name="name" required minlength="2"></label>
+      <label>Description<textarea name="description"></textarea></label>
+      <div class="role-matrix">
+        <table><thead><tr><th>Module</th><th>View</th><th>Create</th><th>Edit</th><th>Delete</th></tr></thead><tbody>
+        {% for module, label in modules %}
+          <tr><td>{{ label }}<input type="hidden" name="module" value="{{ module }}"></td>
+            <td><input type="checkbox" name="{{ module }}_can_view"></td><td><input type="checkbox" name="{{ module }}_can_create"></td><td><input type="checkbox" name="{{ module }}_can_edit"></td><td><input type="checkbox" name="{{ module }}_can_delete"></td></tr>
+        {% endfor %}
+        </tbody></table>
+      </div>
+      <footer><button type="button" id="cancel-role" class="secondary">Cancel</button><button type="submit">Save role</button></footer>
+    </form>
+  </article></dialog>
+  <script>
+    const dialog = document.getElementById('role-dialog');
+    const form = document.getElementById('role-form');
+    const permissions = {{ permissions_by_role_json | safe }};
+    document.getElementById('add-role').addEventListener('click', () => {
+      form.reset(); form.elements.role_id.value = '';
+      document.getElementById('role-dialog-title').textContent = 'Add role';
+      dialog.showModal();
+    });
+    document.getElementById('cancel-role').addEventListener('click', () => dialog.close());
+    document.querySelectorAll('[data-edit-role]').forEach(button => button.addEventListener('click', () => {
+      form.reset(); form.elements.role_id.value = button.dataset.editRole;
+      form.elements.name.value = button.dataset.roleName; form.elements.description.value = button.dataset.roleDescription;
+      document.getElementById('role-dialog-title').textContent = 'Configure role';
+      const rolePermissions = permissions[button.dataset.roleName] || {};
+      Object.entries(rolePermissions).forEach(([module, permission]) => ['can_view','can_create','can_edit','can_delete'].forEach(action => {
+        const field = form.elements[module + '_' + action];
+        if (field) field.checked = permission[action] == 1;
+      }));
+      dialog.showModal();
+    }));
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const roleId = form.elements.role_id.value;
+      const payload = {name: form.elements.name.value, description: form.elements.description.value, permissions: {}};
+      document.querySelectorAll('input[name="module"]').forEach(input => {
+        payload.permissions[input.value] = {};
+        ['can_view','can_create','can_edit','can_delete'].forEach(action => payload.permissions[input.value][action] = form.elements[input.value + '_' + action].checked);
+      });
+      const response = await fetch(roleId ? `/roles/${roleId}` : '/roles', {method: roleId ? 'PUT' : 'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+      if (!response.ok) { alert(await response.text()); return; }
+      location.reload();
+    });
+    document.querySelectorAll('[data-delete-role]').forEach(button => button.addEventListener('click', async () => {
+      if (!confirm(`Delete the ${button.dataset.roleName} role?`)) return;
+      const response = await fetch(`/roles/${button.dataset.deleteRole}`, {method:'DELETE'});
+      if (!response.ok) { alert(await response.text()); return; }
+      location.reload();
+    }));
+  </script>
+</body>
+</html>

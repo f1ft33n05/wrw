@@ -3,6 +3,7 @@ from enum import Enum
 from decimal import Decimal
 from typing import Literal
 from pydantic import Field, field_validator
+from config import CURRENCY_CODE
 
 class Role(str, Enum):
     admin = "admin"
@@ -24,7 +25,7 @@ class CreateUserRequest(BaseModel):
     password: str
     email: str
     phone: str
-    role: Role
+    role: str = Field(min_length=1)
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -34,7 +35,7 @@ class UpdateUserRequest(BaseModel):
     username: str
     email: str
     phone: str
-    role: Role
+    role: str = Field(min_length=1)
     password: str | None = None
 
 
@@ -44,7 +45,7 @@ class UserResponse(BaseModel):
     username: str
     email: str
     phone: str
-    role: Role
+    role: str
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -212,7 +213,6 @@ class DiscountRequest(BaseModel):
 class SaleLineRequest(BaseModel):
     item_id: int
     quantity: Decimal = Field(gt=0)
-    discount_percentage: Decimal | None = Field(default=None, ge=0, le=100)
 
     @field_validator("quantity")
     @classmethod
@@ -265,7 +265,7 @@ class DocumentRequest(BaseModel):
     notes: str | None = None
     tax_rate: Decimal = Field(default=Decimal("0"), ge=0, le=100)
     discount_amount: Decimal = Field(default=Decimal("0"), ge=0)
-    currency: str = "MWK"
+    currency: str = CURRENCY_CODE
     lines: list[DocumentLineRequest] = Field(min_length=1)
 
 

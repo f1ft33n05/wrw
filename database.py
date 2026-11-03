@@ -6,10 +6,26 @@ import database_models
 from database_models import User, Contact
 from typing import Annotated
 from fastapi import Depends
+from passlib.context import CryptContext
+from config import (
+    ADMIN_EMAIL,
+    ADMIN_NAME,
+    ADMIN_PASSWORD,
+    ADMIN_PHONE,
+    ADMIN_USERNAME,
+    DATABASE_URL,
+    DEFAULT_CUSTOMER_ADDRESS,
+    DEFAULT_CUSTOMER_EMAIL,
+    DEFAULT_CUSTOMER_NAME,
+    DEFAULT_CUSTOMER_PHONE,
+)
+
+password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 db_url = "postgresql://postgres:bstar1234@localhost:5432/wrw_db"
 
+db_url = DATABASE_URL
 engine = create_engine(db_url)
 
 session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -19,6 +35,11 @@ install_date = datetime.now(timezone.utc)
 seed_data = [
     User(name="Admin", username="admin", password="$2b$12$nkfCnkzJOc3eBWekSr/dAO1di/aJvFVOdGQBbm2if.hmeZNpTOvue", email="f1ft33n05@gmail.com", phone="1234567890", role="admin", created_at=install_date, updated_at=install_date),
     Contact(name="Walkin Customer", email="walkincustomer@wrw.com", phone="0987654321", contact_type="customer", address="Area 1, Lilongwe.", outstanding_balance=0, created_at=install_date, updated_at=install_date)
+]
+
+seed_data = [
+    User(name=ADMIN_NAME, username=ADMIN_USERNAME, password=password_context.hash(ADMIN_PASSWORD or "ChangeMe-Not-For-Production-123"), email=ADMIN_EMAIL, phone=ADMIN_PHONE, role="admin", created_at=install_date, updated_at=install_date),
+    Contact(name=DEFAULT_CUSTOMER_NAME, email=DEFAULT_CUSTOMER_EMAIL, phone=DEFAULT_CUSTOMER_PHONE, contact_type="customer", address=DEFAULT_CUSTOMER_ADDRESS, outstanding_balance=0, created_at=install_date, updated_at=install_date),
 ]
 
 def get_db():
@@ -158,6 +179,38 @@ def ensure_sales_columns(database_engine: Engine) -> None:
 def init_db():
     ensure_sales_columns(engine)
     db = session()
+    for user in db.query(User).all():
+        if user.password and not user.password.startswith(("$2b$", "$2a$", "$2y$")):
+            user.password = password_context.hash(user.password)
+    db.commit()
+    if db.query(database_models.RoleDefinition).count() == 0:
+        module_permissions = {
+            "admin": ["dashboard", "users", "contacts", "items", "sales", "events", "quotations", "invoices", "purchases", "reports", "inventory"],
+            "manager": ["dashboard", "users", "contacts", "items", "sales", "events", "quotations", "invoices", "purchases", "reports", "inventory"],
+            "cashier": ["dashboard", "contacts", "items", "sales", "events", "quotations", "invoices", "inventory"],
+        }
+        for role_name, modules in module_permissions.items():
+            role = database_models.RoleDefinition(
+                name=role_name,
+                description=f"{role_name.title()} role",
+                system_role=1,
+                created_at=install_date.isoformat(),
+                updated_at=install_date.isoformat(),
+            )
+            db.add(role)
+            db.flush()
+            for module in modules:
+                db.add(database_models.RolePermission(
+                    role_name=role_name,
+                    module=module,
+                    can_view=1,
+                    can_create=1 if role_name != "cashier" or module in {"sales"} else 0,
+                    can_edit=1 if role_name != "cashier" else 0,
+                    can_delete=1 if role_name == "admin" else 0,
+                    created_at=install_date.isoformat(),
+                    updated_at=install_date.isoformat(),
+                ))
+        db.commit()
     count = db.query(database_models.User).count()
     if count == 0:
         for item in seed_data:

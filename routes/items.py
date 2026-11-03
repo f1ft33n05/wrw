@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -25,6 +24,7 @@ from database_models import (
 from database import db_dependency
 from models import CreateItemRequest, CategoryRequest, DiscountRequest, Role, StockAdjustmentRequest
 from routes.auth import RoleChecker, get_current_user
+from config import APP_TIMEZONE as CONFIGURED_TIMEZONE
 
 
 router = APIRouter(
@@ -34,7 +34,7 @@ router = APIRouter(
 templates = Jinja2Templates(directory="templates")
 user_dependency = Annotated[dict, Depends(get_current_user)]
 MANAGEMENT_ACCESS = Depends(RoleChecker(Role.admin, Role.manager))
-APP_TIMEZONE = ZoneInfo("Africa/Harare")
+APP_TIMEZONE = CONFIGURED_TIMEZONE
 
 def serialize_timestamp(value: datetime | str | None) -> str | None:
     if value is None:
@@ -114,12 +114,27 @@ async def adjust_stock(item_id: int, payload: StockAdjustmentRequest, db: db_dep
     return {"id": item.id, "quantity": item.quantity}
 
 
-@router.get("/categories/manage", response_class=HTMLResponse)
+@router.get("/categories", response_class=HTMLResponse)
+@router.get("/categories/manage", response_class=HTMLResponse, include_in_schema=False)
 async def categories_page(request: Request, user: user_dependency, db: db_dependency):
     categories = db.query(ItemCategory).order_by(ItemCategory.name).all()
+    return templates.TemplateResponse(request, "categories.html", {
+        "user": user, "categories": categories,
+    })
+
+
+@router.get("/discounts", response_class=HTMLResponse)
+async def discounts_page(request: Request, user: user_dependency, db: db_dependency):
     discounts = db.query(ItemDiscount).order_by(ItemDiscount.name).all()
-    return templates.TemplateResponse(request, "item_categories.html", {
-        "user": user, "categories": categories, "discounts": discounts,
+    categories = db.query(ItemCategory).order_by(ItemCategory.name).all()
+    items = db.query(Item).order_by(Item.name).all()
+    return templates.TemplateResponse(request, "discounts.html", {
+        "user": user,
+        "discounts": discounts,
+        "categories": categories,
+        "items": items,
+        "category_names": {category.id: category.name for category in categories},
+        "item_names": {item.id: item.name for item in items},
     })
 
 

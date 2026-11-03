@@ -2,10 +2,9 @@ import json
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette import status
 
@@ -19,12 +18,15 @@ from models import (
     SaleTransactionResponse,
 )
 from routes.auth import RoleChecker, get_current_user
+from config import APP_TIMEZONE as CONFIGURED_TIMEZONE
+from config import CURRENCY_CODE
+from idempotency import get_cached_response, require_idempotency_key, save_response
 
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 templates = Jinja2Templates(directory="templates")
 user_dependency = Annotated[dict, Depends(get_current_user)]
-APP_TIMEZONE = ZoneInfo("Africa/Harare")
+APP_TIMEZONE = CONFIGURED_TIMEZONE
 CENT = Decimal("0.01")
 PAYMENT_METHODS = {"cash", "card", "mobile money", "bank transfer"}
 SALES_ACCESS = Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))
@@ -56,12 +58,10 @@ def _compact_decimal(value: object, description: str) -> str:
 
 
 def _format_money(value: object) -> str:
-    return f"MWK {_money(_decimal(value, 'money amount')):,.2f}"
+    return f"{CURRENCY_CODE} {_money(_decimal(value, 'money amount')):,.2f}"
 
 
-def _active_discount(db, item: Item, requested: Decimal | None = None) -> Decimal:
-    if requested is not None:
-        return requested
+def _active_discount(db, item: Item) -> Decimal:
     discounts = db.query(ItemDiscount).filter(ItemDiscount.active == 1).all()
     item_discount = next((d for d in discounts if d.discount_type == "item" and d.target_id == item.id), None)
     category_discount = next((d for d in discounts if d.discount_type == "category" and d.target_id == item.category_id), None)
@@ -251,6 +251,82 @@ async def sales_list(request: Request, user: user_dependency, db: db_dependency)
     )
 
 
+@router.get("/receipts", response_class=HTMLResponse, dependencies=[SALES_ACCESS])
+async def sales_receipts(request: Request, user: user_dependency, db: db_dependency):
+    invoices = db.query(Invoices).order_by(Invoices.created_at.desc()).all()
+    customer_ids = {invoice.customer_id for invoice in invoices if invoice.customer_id}
+    customers = {
+        contact.id: contact.name
+        for contact in (
+            db.query(Contact).filter(Contact.id.in_(customer_ids)).all()
+            if customer_ids else []
+        )
+    }
+    rows = []
+    for invoice in invoices:
+        if invoice.created_at is not None:
+            rows.append({
+                "id": invoice.id,
+                "document_number": invoice.document_number or f"INV-{invoice.id}",
+                "customer": customers.get(invoice.customer_id, "Walk-in customer"),
+                "created_at": _display_timestamp(invoice.created_at),
+                "total": _decimal(invoice.total_price, "invoice total"),
+                "receipt_url": f"/sales/{invoice.id}/receipt",
+            })
+    return templates.TemplateResponse(request, "sales_receipts.html", {
+        "user": user,
+        "receipts": rows,
+    })
+
+
+@router.get("/payments", response_class=HTMLResponse, dependencies=[SALES_ACCESS])
+async def sales_payments(request: Request, user: user_dependency, db: db_dependency):
+    payments = db.query(Payments).filter(Payments.status == "completed").order_by(Payments.created_at.desc()).all()
+    invoice_ids = {payment.invoice_id for payment in payments if payment.invoice_id}
+    invoices = {
+        invoice.id: invoice
+        for invoice in (
+            db.query(Invoices).filter(Invoices.id.in_(invoice_ids)).all()
+            if invoice_ids else []
+        )
+    }
+    customer_ids = {
+        invoice.customer_id for invoice in invoices.values() if invoice.customer_id
+    }
+    customers = {
+        contact.id: contact.name
+        for contact in (
+            db.query(Contact).filter(Contact.id.in_(customer_ids)).all()
+            if customer_ids else []
+        )
+    }
+    collector_ids = {payment.collected_by for payment in payments if payment.collected_by}
+    collectors = {
+        collector.id: collector.name
+        for collector in (
+            db.query(User).filter(User.id.in_(collector_ids)).all()
+            if collector_ids else []
+        )
+    }
+    rows = []
+    for payment in payments:
+        invoice = invoices.get(payment.invoice_id)
+        rows.append({
+            "id": payment.id,
+            "invoice_number": invoice.document_number if invoice and invoice.document_number else f"INV-{payment.invoice_id}",
+            "customer": customers.get(invoice.customer_id, "Walk-in customer") if invoice else "Walk-in customer",
+            "amount": _decimal(payment.amount, "payment amount"),
+            "payment_method": payment.payment_method,
+            "collected_by": collectors.get(payment.collected_by, "-"),
+            "created_at": _display_timestamp(payment.created_at),
+            "receipt_url": f"/sales/{payment.invoice_id}/receipt",
+        })
+    return templates.TemplateResponse(request, "sales_payments.html", {
+        "user": user,
+        "payments": rows,
+    })
+
+
 @router.get(
     "/pos",
     response_class=HTMLResponse,
@@ -287,7 +363,12 @@ async def create_sale(
     checkout: CheckoutRequest,
     db: db_dependency,
     current_user: user_dependency,
+    request: Request,
 ):
+    require_idempotency_key(request)
+    cached = get_cached_response(db, request)
+    if cached:
+        return JSONResponse(status_code=cached[0], content=cached[1])
     event = None
     if checkout.event_id is not None:
         event = db.query(Events).filter(Events.id == checkout.event_id).first()
@@ -318,11 +399,8 @@ async def create_sale(
         )
 
     quantities: dict[int, Decimal] = {}
-    requested_discounts: dict[int, Decimal] = {}
     for line in checkout.items:
         quantities[line.item_id] = quantities.get(line.item_id, Decimal("0")) + line.quantity
-        if line.discount_percentage is not None:
-            requested_discounts[line.item_id] = line.discount_percentage
 
     try:
         items = (
@@ -395,7 +473,7 @@ async def create_sale(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"{item.name} does not have a valid retail price",
                 )
-            discount_percentage = _active_discount(db, item, requested_discounts.get(item_id))
+            discount_percentage = _active_discount(db, item)
             undiscounted_total = _money(
                 wholesale_unit_price * wholesale_quantity
                 + retail_unit_price * retail_quantity
@@ -431,7 +509,7 @@ async def create_sale(
                     "retail_quantity": str(retail_quantity),
                     "retail_unit_price": str(retail_unit_price),
                     "unit_prices": (
-                        f"MWK {_compact_decimal(wholesale_unit_price, 'wholesale price')}:"
+                        f"{CURRENCY_CODE} {_compact_decimal(wholesale_unit_price, 'wholesale price')}:"
                         f"{_compact_decimal(retail_unit_price, 'retail price')}"
                     ),
                 }
@@ -506,7 +584,7 @@ async def create_sale(
             )
 
         db.commit()
-        return {
+        response = {
             "message": "Sale created successfully",
             "invoice_id": invoice.id,
             "total_amount": str(total),
@@ -516,6 +594,9 @@ async def create_sale(
             "balance_due": str(max(total - amount_paid, Decimal("0"))),
             "receipt_url": f"/sales/{invoice.id}/receipt",
         }
+        save_response(db, request, status.HTTP_201_CREATED, response)
+        db.commit()
+        return response
     except Exception:
         db.rollback()
         raise
@@ -665,12 +746,12 @@ async def receipt(
         if wholesale_quantity is not None and Decimal(wholesale_quantity) > 0:
             price_segments.append(
                 f'{_compact_decimal(wholesale_quantity, "wholesale quantity")} @ '
-                f'MWK {_compact_decimal(snapshot["wholesale_unit_price"], "wholesale price")}'
+                f'{CURRENCY_CODE} {_compact_decimal(snapshot["wholesale_unit_price"], "wholesale price")}'
             )
         if retail_quantity is not None and Decimal(retail_quantity) > 0:
             price_segments.append(
                 f'{_compact_decimal(retail_quantity, "retail quantity")} @ '
-                f'MWK {_compact_decimal(snapshot["retail_unit_price"], "retail price")}'
+                f'{CURRENCY_CODE} {_compact_decimal(snapshot["retail_unit_price"], "retail price")}'
             )
         lines.append(
             {

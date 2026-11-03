@@ -1,22 +1,20 @@
-import os
-from dotenv import load_dotenv
 from datetime import datetime, timedelta, timezone
+import time
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from database_models import User
+from database_models import User, RolePermission
 from database import db_dependency
 from starlette import status
 from typing import Annotated
 from models import Role, Token
+from config import ACCESS_TOKEN_EXPIRE_MINUTES, ENVIRONMENT, JWT_ALGORITHM, SECRET_KEY
+from audit import record_audit_event
 
-load_dotenv()  # loads .env in the project root
-
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ALGORITHM = JWT_ALGORITHM
 
 router = APIRouter(
     prefix="/auth",
@@ -26,6 +24,18 @@ router = APIRouter(
 bcrypt_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token', auto_error=False)
+
+login_attempts: dict[str, list[float]] = {}
+
+
+def _check_login_rate_limit(request: Request) -> None:
+    key = request.client.host if request.client else "unknown"
+    now = time.monotonic()
+    recent = [timestamp for timestamp in login_attempts.get(key, []) if now - timestamp < 900]
+    if len(recent) >= 5:
+        raise HTTPException(status_code=429, detail="Too many login attempts. Try again later.")
+    recent.append(now)
+    login_attempts[key] = recent
 
 
 @router.post("/token", response_model=Token)
@@ -37,7 +47,7 @@ async def generate_access_token(db: db_dependency, form_data: Annotated[OAuth2Pa
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    token_expires = timedelta(minutes=20)
+    token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     token = create_access_token(user.username, user.id, user.role, expires_delta=token_expires)
 
     return {"access_token": token, "token_type": "bearer"}
@@ -48,15 +58,18 @@ async def login(
     db: db_dependency,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ):
+    _check_login_rate_limit(request)
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
+        record_audit_event(db, action="auth.login", outcome="failure", ip_address=request.client.host if request.client else None)
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token_expires = timedelta(minutes=20)
+    token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     token = create_access_token(user.username, user.id, user.role, expires_delta=token_expires)
     response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
@@ -64,9 +77,11 @@ async def login(
         value=token,
         max_age=int(token_expires.total_seconds()),
         httponly=True,
-        secure=request.url.scheme == "https",
+        secure=ENVIRONMENT == "production" or request.url.scheme == "https",
         samesite="lax",
     )
+    record_audit_event(db, action="auth.login", outcome="success", actor={"id": user.id, "username": user.username}, ip_address=request.client.host if request.client else None)
+    db.commit()
     return response
 
 @router.post("/logout")
@@ -76,7 +91,7 @@ async def logout(request: Request):
         key="access_token",
         path="/",
         httponly=True,
-        secure=request.url.scheme == "https",
+        secure=ENVIRONMENT == "production" or request.url.scheme == "https",
         samesite="lax",
     )
     return response
@@ -102,7 +117,7 @@ def create_access_token(username: str, user_id: int, role: str, expires_delta: t
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=20)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     encode.update({"exp": expire})
     return jwt.encode(encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -133,15 +148,29 @@ async def get_current_user(
 
 
 class RoleChecker:
-    def __init__(self, *allowed_roles: Role):
+    def __init__(self, *allowed_roles: Role, module: str | None = None, action: str = "can_view"):
         self.allowed_roles = {role.value for role in allowed_roles}
+        self.module = module
+        if action not in {"can_view", "can_create", "can_edit", "can_delete"}:
+            raise ValueError("Invalid role permission action")
+        self.action = action
 
     async def __call__(
         self,
         current_user: Annotated[dict, Depends(get_current_user)],
+        db: db_dependency,
     ):
-        if current_user["role"] not in self.allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have permission to access this resource",
-            )
+        if current_user["role"] in self.allowed_roles:
+            return
+        if self.module:
+            permission = db.query(RolePermission).filter(
+                RolePermission.role_name == current_user["role"],
+                RolePermission.module == self.module,
+                getattr(RolePermission, self.action) == 1,
+            ).first()
+            if permission:
+                return
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this resource",
+        )

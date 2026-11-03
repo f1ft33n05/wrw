@@ -12,6 +12,7 @@ from database_models import Contact, Invoices, Item, Quotations
 from models import DocumentRequest, Role
 from routes.auth import RoleChecker, get_current_user
 from routes.ledger_utils import decimal_value, format_money, money
+from config import CURRENCY_CODE
 
 
 router = APIRouter(tags=["documents"])
@@ -214,7 +215,7 @@ def _render_document(request, user, db, model, document_id, document_type):
         "tax_amount": tax_amount,
         "discount_amount": discount_amount,
         "total": decimal_value(document.total_price, "document total"),
-        "currency": document.currency or "MWK",
+        "currency": document.currency or CURRENCY_CODE,
     })
 
 

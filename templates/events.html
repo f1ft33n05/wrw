@@ -1,6 +1,8 @@
 {% include "header.html" %}
 <body>
-  <main class="container">
+  <div class="container row">
+    {% include "sidebar.html" %}
+    <main class="col-xs-12 col-md-9">
     <header>
       <nav>
         <ul><li><strong>Events</strong></li></ul>
@@ -45,6 +47,7 @@
       </tbody>
     </table>
   </main>
+  </div>
   <script src="{{ url_for('static', path='js/events.js') }}"></script>
 </body>
 </html>

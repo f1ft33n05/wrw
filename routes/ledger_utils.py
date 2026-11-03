@@ -2,6 +2,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from fastapi import HTTPException
 from starlette import status
+from config import CURRENCY_CODE
 
 
 CENT = Decimal("0.01")
@@ -28,7 +29,7 @@ def money(value: Decimal) -> Decimal:
 
 
 def format_money(value: object) -> str:
-    return f"MWK {money(decimal_value(value, 'money amount')):,.2f}"
+    return f"{CURRENCY_CODE} {money(decimal_value(value, 'money amount')):,.2f}"
 
 
 def format_compact(value: object, description: str) -> str:

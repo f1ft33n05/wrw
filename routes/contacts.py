@@ -1,7 +1,6 @@
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -30,6 +29,7 @@ from models import CreateContactRequest
 from models import Role
 from routes.auth import RoleChecker, get_current_user
 from routes.ledger_utils import decimal_value, format_money
+from config import APP_TIMEZONE as CONFIGURED_TIMEZONE
 
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
@@ -37,7 +37,7 @@ pages_router = APIRouter(tags=["contacts"])
 templates = Jinja2Templates(directory="templates")
 templates.env.filters["money"] = format_money
 
-APP_TIMEZONE = ZoneInfo("Africa/Harare")
+APP_TIMEZONE = CONFIGURED_TIMEZONE
 
 
 @pages_router.get(

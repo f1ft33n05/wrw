@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
+from config import CURRENCY_CODE
 
 Base = declarative_base()
 
@@ -15,6 +16,33 @@ class User(Base):
     role = Column(String)
     created_at = Column(String)
     updated_at = Column(String)
+
+
+class RoleDefinition(Base):
+    __tablename__ = "role_definitions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False, index=True)
+    description = Column(String)
+    system_role = Column(Integer, default=0)
+    created_at = Column(String)
+    updated_at = Column(String)
+
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    role_name = Column(String, nullable=False, index=True)
+    module = Column(String, nullable=False, index=True)
+    can_view = Column(Integer, default=0)
+    can_create = Column(Integer, default=0)
+    can_edit = Column(Integer, default=0)
+    can_delete = Column(Integer, default=0)
+    created_at = Column(String)
+    updated_at = Column(String)
+
+    __table_args__ = (UniqueConstraint("role_name", "module"),)
 
 class Contact(Base):
     __tablename__ = "contacts"
@@ -236,7 +264,7 @@ class Quotations(Base):
     tax_rate = Column(String)
     tax_amount = Column(String)
     discount_amount = Column(String)
-    currency = Column(String, default="MWK")
+    currency = Column(String, default=CURRENCY_CODE)
     created_by = Column(Integer)
     items = Column(String)  # JSON string of items, quantities and unit prices
     total_price = Column(String)
@@ -258,7 +286,7 @@ class Invoices(Base):
     tax_rate = Column(String)
     tax_amount = Column(String)
     discount_amount = Column(String)
-    currency = Column(String, default="MWK")
+    currency = Column(String, default=CURRENCY_CODE)
     created_by = Column(Integer)
     items = Column(String)  # JSON string of items, quantities and unit prices
     total_price = Column(String)
@@ -288,3 +316,28 @@ class PaymmetMethods(Base):
     description = Column(String)
     created_at = Column(String)
     updated_at = Column(String)
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    occurred_at = Column(String, nullable=False, index=True)
+    actor_id = Column(Integer, index=True)
+    actor_name = Column(String)
+    action = Column(String, nullable=False, index=True)
+    resource_type = Column(String, index=True)
+    resource_id = Column(String, index=True)
+    ip_address = Column(String)
+    outcome = Column(String, nullable=False)
+
+
+class IdempotencyKey(Base):
+    __tablename__ = "idempotency_keys"
+
+    key = Column(String, primary_key=True)
+    method = Column(String, nullable=False)
+    path = Column(String, nullable=False)
+    response_status = Column(Integer, nullable=False)
+    response_body = Column(String, nullable=False)
+    created_at = Column(String, nullable=False)

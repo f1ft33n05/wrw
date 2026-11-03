@@ -1,0 +1,76 @@
+      <aside class="col-xs-12 col-md-2">
+        <nav>
+          <ul>
+            <li><a href="/dashboard">Home</a></li>
+            {% if user.role in ["admin", "manager"] %}
+            <li>
+              <details name="navigation">
+                <summary>Users</summary>
+                <ul>
+                  <li><a href="/users/"{% if request.path == "/users/" or request.path == "/users" %} aria-current="page"{% endif %}>All Users</a></li>
+                  <li><a href="/roles/"{% if request.path.startswith("/roles") %} aria-current="page"{% endif %}>Roles</a></li>
+                </ul>
+              </details>
+            </li>
+            {% endif %}
+            <li>
+              <details name="navigation">
+                <summary>Contacts</summary>
+                <ul>
+                  <li><a href="/suppliers">Suppliers</a></li>
+                  <li><a href="/customers">Customers</a></li>
+                  <li><a href="/resellers">Resellers</a></li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <details name="navigation"{% if request.path.startswith("/items") %} open{% endif %}>
+                <summary>Items</summary>
+                <ul>
+                  <li><a href="/items">List Items</a></li>
+                  <li><a href="/items#import-item">Add Item</a></li>
+                  <li><a href="/items/import/page">Import Items</a></li>
+                  <li><a href="/items/categories">Categories</a></li>
+                  <li><a href="/items/discounts">Discounts</a></li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <details name="navigation"{% if request.path.startswith("/sales") or request.path.startswith("/events") or request.path.startswith("/reseller") %} open{% endif %}>
+                <summary>Sell</summary>
+                <ul>
+                  <li><a href="/sales/list">All Sales</a></li>
+                  <li><a href="/sales/pos">POS</a></li>
+                  <li><a href="/events">Events</a></li>
+                  {% if user.role in ["admin", "manager"] %}
+                  <li><a href="/reseller_pg">Reseller</a></li>
+                  {% endif %}
+                </ul>
+              </details>
+            </li>
+            <li><a href="/sales/receipts"{% if request.path == "/sales/receipts" %} aria-current="page"{% endif %}>Receipts</a></li>
+            <li><a href="/sales/payments"{% if request.path == "/sales/payments" %} aria-current="page"{% endif %}>Payments</a></li>
+            <li><a href="/quotations">Quotes</a></li>
+            <li><a href="/invoices">Invoices</a></li>
+            {% if user.role in ["admin", "manager"] %}
+            <li><a href="/purchases">Purchases</a></li>
+            {% endif %}
+            <li>
+              <details name="navigation"{% if request.path.startswith("/reports") or request.path in ["/sales_report", "/stock_report", "/purchase_sale_report"] %} open{% endif %}>
+                <summary>Reports</summary>
+                <ul>
+                  <li><a href="/reports">All Reports</a></li>
+                  <li><a href="/sales_report">Sales Report</a></li>
+                  <li><a href="/stock_report">Stock Report</a></li>
+                  <li><a href="/purchase_sale_report">Purchase &amp; Sale Report</a></li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <form action="/auth/logout" method="post">
+                <button type="submit" class="logout-link">Log out</button>
+              </form>
+            </li>
+          </ul>
+        </nav>
+      </aside>

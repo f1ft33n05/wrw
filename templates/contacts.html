@@ -1,5 +1,8 @@
 {% include "header.html" %}
 <body>
+  <div class="container row">
+    {% include "sidebar.html" %}
+    <div class="col-xs-12 col-md-9">
   <header>
     <nav>
       <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="We are Wines"></a></div>
@@ -85,5 +88,7 @@
     {% endif %}
   </main>
   <script src="{{ url_for('static', path='js/contacts.js') }}"></script>
+  </div>
+  </div>
 </body>
 </html>

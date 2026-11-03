@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Annotated
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -20,6 +19,7 @@ from database_models import (
 from models import PurchaseCreateRequest, PurchasePaymentRequest, Role
 from routes.auth import RoleChecker, get_current_user
 from routes.ledger_utils import decimal_value, format_money, money, validate_payment_method
+from config import APP_TIMEZONE as CONFIGURED_TIMEZONE
 
 
 router = APIRouter(prefix="/purchases", tags=["purchases"])
@@ -27,7 +27,7 @@ templates = Jinja2Templates(directory="templates")
 templates.env.filters["money"] = format_money
 user_dependency = Annotated[dict, Depends(get_current_user)]
 PURCHASE_ACCESS = Depends(RoleChecker(Role.admin, Role.manager))
-APP_TIMEZONE = ZoneInfo("Africa/Harare")
+APP_TIMEZONE = CONFIGURED_TIMEZONE
 
 
 def display_timestamp(value: datetime | str | None) -> str:
