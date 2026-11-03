@@ -14,6 +14,9 @@ import routes.items as items
 import routes.sales as sales
 import routes.purchases as purchases
 import routes.resellers as resellers
+import routes.events as events
+import routes.documents as documents
+import routes.reports as reports
 from routes.auth import get_current_user
 from models import Role
 from routes.auth import RoleChecker
@@ -28,6 +31,9 @@ app.include_router(items.router)
 app.include_router(sales.router)
 app.include_router(purchases.router)
 app.include_router(resellers.router)
+app.include_router(events.router)
+app.include_router(documents.router)
+app.include_router(reports.router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

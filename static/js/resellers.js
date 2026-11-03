@@ -120,7 +120,8 @@ if (resellerPaymentForm) {
                 const error = await response.json();
                 throw new Error(error.detail || `Payment failed (${response.status})`);
             }
-            window.location.reload();
+            const result = await response.json();
+            window.location.assign(result.receipt_url);
         } catch (error) {
             errorMessage.textContent = error.message;
         }

@@ -1,0 +1,50 @@
+{% include "header.html" %}
+<body>
+  <main class="container">
+    <header>
+      <nav>
+        <ul><li><strong>Events</strong></li></ul>
+        <ul><li><a href="/dashboard">Dashboard</a></li><li><a href="/sales/list">Sales</a></li></ul>
+      </nav>
+    </header>
+    {% if user.role in ["admin", "manager"] %}
+    <details>
+      <summary>Add event</summary>
+      <form id="event-form">
+        <div class="grid">
+          <label>Name<input name="name" required></label>
+          <label>Venue<input name="venue"></label>
+          <label>Event type<input name="event_type"></label>
+        </div>
+        <div class="grid">
+          <label>Start date<input name="starts_at_date" type="date"></label>
+          <label>Starts at<input name="starts_at_time" type="time"></label>
+          <label>Ends at<input name="ends_at_time" type="time"></label>
+          <label>Status<select name="status"><option>planned</option><option>active</option><option>closed</option><option>cancelled</option></select></label>
+        </div>
+        <label>End date<input name="ends_at_date" type="date"></label>
+        <label>Description<textarea name="description"></textarea></label>
+        <p id="event-error" role="alert"></p>
+        <button type="submit">Create event</button>
+      </form>
+    </details>
+    {% endif %}
+    <table class="striped">
+      <thead><tr><th>Name</th><th>Venue</th><th>Dates</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for event in events %}
+        <tr>
+          <td>{{ event.name }}</td><td>{{ event.venue or "-" }}</td>
+          <td>{{ event.starts_at or "-" }}{% if event.ends_at %} to {{ event.ends_at }}{% endif %}</td>
+          <td>{{ event.event_type or "-" }}</td><td>{{ event.status|title }}</td>
+          <td><a role="button" href="/events/{{ event.id }}">View sales</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No events found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </main>
+  <script src="{{ url_for('static', path='js/events.js') }}"></script>
+</body>
+</html>

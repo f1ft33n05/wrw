@@ -63,7 +63,7 @@
                 <ul>
                   <li><a href="/sales/list">All Sales</a></li>
                   <li><a href="/sales/pos">POS</a></li>
-                  <li><a href="/sales_events">Events</a></li>
+                  <li><a href="/events">Events</a></li>
                   {% if user.role in ["admin", "manager"] %}
                   <li><a href="/reseller_pg">Reseller</a></li>
                   {% endif %}
@@ -81,6 +81,7 @@
               <details name="sell">
                 <summary>Reports</summary>
                 <ul>
+                  <li><a href="/reports">All Reports</a></li>
                   <li><a href="/sales_report">Sales Report</a></li>
                   <li><a href="/stock_report">Stock Report</a></li>
                   <li><a href="/purchase_sale_report">Purchase & Sale Report</a></li>

@@ -1,0 +1,91 @@
+{% include "header.html" %}
+<body>
+  <header>
+    <nav>
+      <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/working--.png') }}" alt="We are Wines Logo"></a></div>
+      <ul><li>{{ user.username }}</li></ul>
+    </nav>
+  </header>
+  <div class="container row">
+    <aside class="col-xs-12 col-md-2">
+      <nav>
+        <ul>
+          <li><a href="/dashboard">Home</a></li>
+          <li><a href="/sales/list">Sales</a></li>
+          <li><a href="/items">Items</a></li>
+          <li><a href="/purchases">Purchases</a></li>
+          <li><a href="/reports"><strong>Reports</strong></a></li>
+        </ul>
+      </nav>
+    </aside>
+    <main class="col-xs-12 col-md-10 reports-page">
+      <article>
+        <header class="row">
+          <section class="title"><h1>Reports</h1>&nbsp;&bull;&nbsp;<span>{{ report_title }}</span></section>
+        </header>
+
+        <div class="report-tabs">
+          {% for value, label in report_types.items() %}
+            <a role="button" class="{{ 'primary' if value == report_type else 'secondary' }}" href="/reports?type={{ value }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">{{ label }}</a>
+          {% endfor %}
+        </div>
+
+        <form method="get" action="/reports" class="row report-filters">
+          <input type="hidden" name="type" value="{{ report_type }}">
+          <label>From
+            <input type="date" name="date_from" value="{{ date_from }}">
+          </label>
+          <label>To
+            <input type="date" name="date_to" value="{{ date_to }}">
+          </label>
+          <button type="submit">Apply filters</button>
+          <a role="button" class="secondary" href="/reports?type={{ report_type }}">Clear</a>
+        </form>
+
+        <div class="report-actions">
+          <strong>{{ row_count }} record{% if row_count != 1 %}s{% endif %}</strong>
+          <span>
+            <a role="button" class="secondary" href="/reports/export/xlsx?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Excel</a>
+            <a role="button" class="secondary" href="/reports/export/pdf?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">PDF</a>
+            <a role="button" class="secondary" href="/reports/export/csv?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">CSV</a>
+            <button type="button" onclick="window.print()">Print</button>
+          </span>
+        </div>
+
+        <div class="report-table">
+          <table>
+            <thead>
+              <tr>{% for column in columns %}<th>{{ column }}</th>{% endfor %}</tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+                <tr>{% for column in columns %}<td>{{ row[column] }}</td>{% endfor %}</tr>
+              {% else %}
+                <tr><td colspan="{{ columns|length }}">No records found for this report.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </main>
+  </div>
+  <style>
+    .report-tabs { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:1rem; }
+    .report-tabs a { margin:0; padding:.55rem .75rem; }
+    .report-filters { align-items:end; gap:.75rem; margin-bottom:1rem; }
+    .report-filters label { margin:0; min-width:180px; }
+    .report-filters button, .report-filters a { margin-bottom:1rem; }
+    .report-actions { display:flex; justify-content:space-between; align-items:center; margin-bottom:.75rem; }
+    .report-actions span { display:flex; gap:.5rem; }
+    .report-actions a, .report-actions button { margin:0; }
+    .report-table { overflow:auto; }
+    @media print {
+      header, aside, .report-tabs, .report-filters, .report-actions button, .report-actions a { display:none !important; }
+      .reports-page { width:100%; max-width:none; }
+      main { margin:0; }
+      table { font-size:10pt; }
+      @page { size:A4 landscape; margin:12mm; }
+    }
+  </style>
+</body>
+</html>

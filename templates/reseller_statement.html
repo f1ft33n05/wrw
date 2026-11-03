@@ -1,0 +1,66 @@
+{% include "header.html" %}
+<style>
+  @page { size: A4 portrait; margin: 12mm; }
+  @media print {
+    .no-print { display: none !important; }
+    main.statement { width: 210mm; max-width: none; padding: 0; }
+  }
+  main.statement { max-width: 210mm; }
+  .statement-header { display: flex; justify-content: space-between; align-items: flex-start; }
+  .statement-header img { width: 190px; }
+  .statement-table { font-size: 0.85rem; }
+  .statement-table th, .statement-table td { vertical-align: top; }
+  .amount { text-align: right; white-space: nowrap; }
+</style>
+<body>
+  <main class="container statement">
+    <nav class="no-print">
+      <ul><li><strong>Reseller statement</strong></li></ul>
+      <ul>
+        <li><a href="/resellers">Reseller contacts</a></li>
+        <li><button type="button" onclick="window.print()">Print</button></li>
+      </ul>
+    </nav>
+    <div class="statement-header">
+      <img src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="We are Wines">
+      <div>
+        <h1>Statement of Transactions</h1>
+        <p>Statement date: {{ statement_date.strftime("%d/%m/%Y %H:%M") }}</p>
+      </div>
+    </div>
+    <section>
+      <h2>{{ reseller.name }}</h2>
+      {% if reseller.email %}<p>{{ reseller.email }}</p>{% endif %}
+      {% if reseller.phone %}<p>{{ reseller.phone }}</p>{% endif %}
+      {% if reseller.address %}<p>{{ reseller.address }}</p>{% endif %}
+    </section>
+    <table class="striped statement-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Reference</th>
+          <th>Transaction</th>
+          <th class="amount">Debit</th>
+          <th class="amount">Credit</th>
+          <th class="amount">Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for transaction in transactions %}
+        <tr>
+          <td>{{ transaction.date }}</td>
+          <td>{{ transaction.reference }}</td>
+          <td><strong>{{ transaction.description }}</strong>{% if transaction.details %}<br>{{ transaction.details }}{% endif %}</td>
+          <td class="amount">{% if transaction.debit > 0 %}{{ transaction.debit|money }}{% else %}-{% endif %}</td>
+          <td class="amount">{% if transaction.credit > 0 %}{{ transaction.credit|money }}{% else %}-{% endif %}</td>
+          <td class="amount">{{ transaction.balance|money }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No transactions found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="amount"><strong>Balance due: {{ balance_due|money }}</strong></p>
+  </main>
+</body>
+</html>

@@ -1,0 +1,40 @@
+{% include "header.html" %}
+<style>
+  @page { size: A4 portrait; margin: 12mm; }
+  @media print { .no-print { display: none !important; } main.document { width: 210mm; max-width: none; padding: 0; } }
+  main.document { max-width: 210mm; }
+  .letterhead { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #222; padding-bottom:10px; margin-bottom:20px; }
+  .letterhead img { width:190px; }
+  .document-meta { text-align:right; }
+  .document-lines { font-size:.85rem; }
+  .amount { text-align:right; white-space:nowrap; }
+</style>
+<body>
+  <main class="container document">
+    <nav class="no-print"><ul><li><strong>{{ document_type|title }}</strong></li></ul><ul><li><a href="/{{ document_type }}s">Back</a></li><li><button type="button" onclick="window.print()">Print</button></li></ul></nav>
+    <div class="letterhead">
+      <img src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="We are Wines">
+      <div class="document-meta"><h1>{{ document_type|upper }}</h1><p><strong>{{ document.document_number }}</strong></p><p>Date: {{ document.issue_date }}</p>{% if document.due_date %}<p>Due: {{ document.due_date }}</p>{% endif %}{% if document.expiry_date %}<p>Expiry: {{ document.expiry_date }}</p>{% endif %}</div>
+    </div>
+    <section>
+      <strong>Bill to</strong>
+      <p>{{ customer.name if customer else "Customer" }}{% if customer and customer.email %}<br>{{ customer.email }}{% endif %}{% if customer and customer.phone %}<br>{{ customer.phone }}{% endif %}{% if customer and customer.address %}<br>{{ customer.address }}{% endif %}</p>
+    </section>
+    <table class="document-lines">
+      <thead><tr><th>#</th><th>Description</th><th class="amount">Qty</th><th class="amount">Rate</th><th class="amount">Discount</th><th class="amount">Amount</th></tr></thead>
+      <tbody>
+        {% for line in lines %}
+        <tr><td>{{ loop.index }}</td><td>{{ line.description }}</td><td class="amount">{{ line.quantity }}</td><td class="amount">{{ currency }} {{ line.unit_price }}</td><td class="amount">{{ line.discount_percentage }}%</td><td class="amount">{{ currency }} {{ line.line_total }}</td></tr>
+        {% else %}<tr><td colspan="6">No items.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    <section class="amount">
+      <p>Subtotal: <strong>{{ currency }} {{ subtotal }}</strong></p>
+      {% if discount_amount > 0 %}<p>Discount: <strong>{{ currency }} {{ discount_amount }}</strong></p>{% endif %}
+      {% if tax_amount > 0 %}<p>Tax: <strong>{{ currency }} {{ tax_amount }}</strong></p>{% endif %}
+      <h2>Total: {{ currency }} {{ total }}</h2>
+    </section>
+    {% if document.notes %}<section><strong>Notes</strong><p>{{ document.notes }}</p></section>{% endif %}
+  </main>
+</body>
+</html>

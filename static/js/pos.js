@@ -166,6 +166,7 @@ posForm.addEventListener("submit", async (event) => {
     button.disabled = true;
     const formData = new FormData(posForm);
     const customerId = formData.get("customer_id");
+    const eventId = formData.get("event_id");
     const amountPaid = Number(formData.get("amount_paid"));
     const total = [...cart.values()].reduce(
         (sum, line) => sum + line.lineTotal,
@@ -180,6 +181,7 @@ posForm.addEventListener("submit", async (event) => {
 
     const payload = {
         customer_id: customerId ? Number(customerId) : null,
+        event_id: eventId ? Number(eventId) : null,
         location: formData.get("location"),
         items: [...cart.entries()].map(([itemId, line]) => ({
             item_id: Number(itemId),

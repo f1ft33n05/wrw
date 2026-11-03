@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from starlette import status
 
 from database import db_dependency
-from database_models import Contact, Invoices, Item, ItemDiscount, Payments, SalesTxn, StockMvt, User
+from database_models import Contact, Events, Invoices, Item, ItemDiscount, Payments, SalesTxn, StockMvt, User
 from models import (
     CheckoutRequest,
     PaymentCollectionRequest,
@@ -196,6 +196,13 @@ async def list_sales(db: db_dependency):
 )
 async def sales_list(request: Request, user: user_dependency, db: db_dependency):
     invoices = db.query(Invoices).order_by(Invoices.id.desc()).all()
+    event_ids = {invoice.event_id for invoice in invoices if invoice.event_id is not None}
+    events = (
+        db.query(Events).filter(Events.id.in_(event_ids)).all()
+        if event_ids
+        else []
+    )
+    event_by_id = {event.id: event for event in events}
     invoice_ids = {invoice.id for invoice in invoices}
     payments = (
         db.query(Payments)
@@ -229,6 +236,7 @@ async def sales_list(request: Request, user: user_dependency, db: db_dependency)
             {
                 "invoice": invoice,
                 "customer_name": customer.name if customer is not None else None,
+                "event_name": event_by_id[invoice.event_id].name if invoice.event_id in event_by_id else None,
                 "created_at": _display_timestamp(invoice.created_at),
                 "total": total,
                 "paid": paid,
@@ -249,7 +257,7 @@ async def sales_list(request: Request, user: user_dependency, db: db_dependency)
     status_code=status.HTTP_200_OK,
     dependencies=[SALES_ACCESS],
 )
-async def pos_screen(request: Request, user: user_dependency, db: db_dependency):
+async def pos_screen(request: Request, user: user_dependency, db: db_dependency, event_id: int | None = None):
     items = db.query(Item).order_by(Item.name).all()
     customers = (
         db.query(Contact)
@@ -257,10 +265,16 @@ async def pos_screen(request: Request, user: user_dependency, db: db_dependency)
         .order_by(Contact.name)
         .all()
     )
+    events = (
+        db.query(Events)
+        .filter(Events.status.in_(["planned", "active"]))
+        .order_by(Events.starts_at.desc(), Events.name)
+        .all()
+    )
     return templates.TemplateResponse(
         request,
         "pos.html",
-        {"user": user, "items": items, "customers": customers},
+        {"user": user, "items": items, "customers": customers, "events": events, "selected_event_id": event_id},
     )
 
 
@@ -274,6 +288,15 @@ async def create_sale(
     db: db_dependency,
     current_user: user_dependency,
 ):
+    event = None
+    if checkout.event_id is not None:
+        event = db.query(Events).filter(Events.id == checkout.event_id).first()
+        if event is None:
+            raise HTTPException(status_code=404, detail="Event not found")
+        if event.status not in {"planned", "active"}:
+            raise HTTPException(status_code=409, detail="Sales cannot be closed for this event")
+        checkout.location = f"Event: {event.name}"
+
     if checkout.payment_method is not None:
         checkout.payment_method = checkout.payment_method.strip().lower()
         if checkout.payment_method not in PAYMENT_METHODS:
@@ -420,6 +443,7 @@ async def create_sale(
         timestamp = datetime.now(timezone.utc).isoformat()
         invoice = Invoices(
             customer_id=checkout.customer_id,
+            event_id=checkout.event_id,
             items=json.dumps(invoice_lines),
             total_price=str(total),
             status=_invoice_status(total, amount_paid),
@@ -450,6 +474,7 @@ async def create_sale(
             db.add(
                 SalesTxn(
                     customer_id=checkout.customer_id,
+                    event_id=checkout.event_id,
                     invoice_id=invoice.id,
                     item_id=item_id,
                     quantity=str(quantity),
@@ -592,6 +617,11 @@ async def receipt(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Sale receipt not found",
         )
+    event = (
+        db.query(Events).filter(Events.id == invoice.event_id).first()
+        if invoice.event_id is not None
+        else None
+    )
     sales = (
         db.query(SalesTxn)
         .filter(SalesTxn.invoice_id == invoice_id)
@@ -670,6 +700,7 @@ async def receipt(
             "invoice": invoice,
             "invoice_created_at": _display_timestamp(invoice.created_at),
             "customer": customer,
+            "event": event,
             "lines": lines,
             "payments": [
                 {

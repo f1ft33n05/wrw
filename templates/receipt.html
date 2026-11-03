@@ -25,6 +25,7 @@
         <h2>Receipt #: {{ invoice.id }}</h2>
         <h3>Date: {{ invoice_created_at }}</h3>
         <p>Customer: {{ customer.name if customer else "Walk-in customer" }}</p>
+        {% if event %}<p>Event: {{ event.name }}{% if event.venue %} — {{ event.venue }}{% endif %}</p>{% endif %}
       <table>
         <thead>
           <tr><th>Item</th><th>Qty</th><th>Price Split</th><th>Unit Price</th><th>Total</th></tr>

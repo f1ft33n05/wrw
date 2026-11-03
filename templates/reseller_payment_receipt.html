@@ -1,0 +1,48 @@
+{% include "header.html" %}
+<style>
+  @media print {
+    .no-print { display: none !important; }
+    main.receipt { max-width: 100%; padding: 0; }
+  }
+  img {
+    width: 30rem;
+    padding: 1rem;
+    margin-bottom: 3rem;
+  }
+</style>
+<body>
+  <main class="container receipt">
+    <nav class="no-print">
+      <ul><li><strong>Reseller payment receipt</strong></li></ul>
+      <ul>
+        <li><a href="/reseller_pg?reseller_id={{ reseller.id }}">Reseller account</a></li>
+        <li><button type="button" onclick="window.print()">Print</button></li>
+      </ul>
+    </nav>
+    <article>
+      <img src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="">
+      <h2>Receipt #: RP-{{ payment.id }}</h2>
+      <h3>Date: {{ payment_date }}</h3>
+      <p><strong>Reseller:</strong> {{ reseller.name }}</p>
+      {% if reseller.phone %}<p><strong>Phone:</strong> {{ reseller.phone }}</p>{% endif %}
+      {% if reseller.address %}<p><strong>Address:</strong> {{ reseller.address }}</p>{% endif %}
+
+      <table>
+        <thead><tr><th>Description</th><th>Method</th><th>Amount</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Reseller reconciliation payment</td>
+            <td>{{ payment.payment_method|replace("_", " ")|title }}</td>
+            <td>{{ amount|money }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p><strong>Amount received: {{ amount|money }}</strong></p>
+      <p>Balance due: {{ balance_due|money }}</p>
+      <p>Received by: {{ collector.name if collector else (collector.username if collector else "Unknown") }}</p>
+      <p>Status: Received</p>
+    </article>
+  </main>
+</body>
+</html>

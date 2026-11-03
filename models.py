@@ -224,6 +224,7 @@ class SaleLineRequest(BaseModel):
 
 class CheckoutRequest(BaseModel):
     customer_id: int | None = None
+    event_id: int | None = None
     location: str = "store"
     items: list[SaleLineRequest] = Field(min_length=1)
     amount_paid: Decimal = Field(ge=0)
@@ -235,6 +236,37 @@ class CheckoutRequest(BaseModel):
         if not value.is_finite():
             raise ValueError("Amount paid must be finite")
         return value
+
+
+class EventRequest(BaseModel):
+    name: str = Field(min_length=1)
+    venue: str | None = None
+    starts_at: str | None = None
+    ends_at: str | None = None
+    event_type: str | None = None
+    description: str | None = None
+    status: str = "planned"
+
+
+class DocumentLineRequest(BaseModel):
+    item_id: int | None = None
+    description: str = Field(min_length=1)
+    quantity: Decimal = Field(gt=0)
+    unit_price: Decimal = Field(ge=0)
+    discount_percentage: Decimal = Field(default=Decimal("0"), ge=0, le=100)
+
+
+class DocumentRequest(BaseModel):
+    customer_id: int
+    document_number: str | None = None
+    issue_date: str
+    due_date: str | None = None
+    expiry_date: str | None = None
+    notes: str | None = None
+    tax_rate: Decimal = Field(default=Decimal("0"), ge=0, le=100)
+    discount_amount: Decimal = Field(default=Decimal("0"), ge=0)
+    currency: str = "MWK"
+    lines: list[DocumentLineRequest] = Field(min_length=1)
 
 
 class PaymentCollectionRequest(BaseModel):

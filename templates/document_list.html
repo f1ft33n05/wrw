@@ -1,0 +1,66 @@
+{% include "header.html" %}
+<body>
+  <main class="container">
+    <nav><ul><li><strong>{{ document_type|title }}s</strong></li></ul><ul><li><a href="/dashboard">Dashboard</a></li><li>{{ user.username }}</li></ul></nav>
+    <details open>
+      <summary>Create {{ document_type }}</summary>
+      <form id="document-form" data-document-type="{{ document_type }}">
+        <div class="grid">
+          <label>Customer<select name="customer_id" required><option value="">Select customer</option>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.name }}</option>{% endfor %}</select></label>
+          <label>Issue date<input name="issue_date" type="date" required></label>
+          <label>{% if document_type == "quotation" %}Expiry date{% else %}Due date{% endif %}<input name="{{ 'expiry_date' if document_type == 'quotation' else 'due_date' }}" type="date"></label>
+        </div>
+        <table>
+          <thead><tr><th>Item</th><th>Description</th><th>Qty</th><th>Unit price</th><th>Discount %</th><th>Amount</th><th></th></tr></thead>
+          <tbody id="document-lines"></tbody>
+        </table>
+        <button type="button" class="secondary" id="add-document-line">Add line</button>
+        <div class="grid">
+          <label>Tax %<input name="tax_rate" type="number" min="0" max="100" step="0.01" value="0"></label>
+          <label>Document discount (MWK)<input name="discount_amount" type="number" min="0" step="0.01" value="0"></label>
+          <label>Currency<select name="currency"><option>MWK</option><option>USD</option><option>ZAR</option></select></label>
+        </div>
+        <label>Notes<textarea name="notes"></textarea></label>
+        <p><strong>Subtotal: <span id="document-subtotal">MWK 0.00</span></strong></p>
+        <p><strong>Tax: <span id="document-tax">MWK 0.00</span></strong></p>
+        <p><strong>Total: <span id="document-total">MWK 0.00</span></strong></p>
+        <p id="document-error" role="alert"></p>
+        <button type="submit">Save {{ document_type }}</button>
+      </form>
+    </details>
+    <template id="document-line-template">
+      <tr>
+        <td><select name="item_id"><option value="">Custom item</option>{% for item in items %}<option value="{{ item.id }}" data-name="{{ item.name }}" data-price="{{ item.selling_price_retail }}">{{ item.name }}</option>{% endfor %}</select></td>
+        <td><input name="description" required></td>
+        <td><input name="quantity" type="number" min="0.01" step="0.01" value="1" required></td>
+        <td><input name="unit_price" type="number" min="0" step="0.01" required></td>
+        <td><input name="discount_percentage" type="number" min="0" max="100" step="0.01" value="0"></td>
+        <td class="document-line-total">MWK 0.00</td>
+        <td><button type="button" class="secondary" data-remove-document-line>Remove</button></td>
+      </tr>
+    </template>
+    <h2>{{ document_type|title }} history</h2>
+    <table class="striped">
+      <thead><tr><th>Number</th><th>Customer</th><th>Date</th><th>Status</th><th>Total</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for document in documents %}
+        <tr>
+          <td>{{ document.document_number or '#' ~ document.id }}</td>
+          <td>Customer #{{ document.customer_id }}</td>
+          <td>{{ document.issue_date or document.created_at }}</td>
+          <td>{{ document.status|replace("_", " ")|title }}</td>
+          <td>{{ document.total_price|money }}</td>
+          <td>
+            <a role="button" class="secondary" href="/{{ document_type }}s/{{ document.id }}/print">View / Print</a>
+            {% if document_type == "quotation" %}<button type="button" data-convert-quotation="{{ document.id }}">Convert to invoice</button>{% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">No {{ document_type }}s found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </main>
+  <script src="{{ url_for('static', path='js/documents.js') }}"></script>
+</body>
+</html>

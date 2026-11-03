@@ -39,6 +39,93 @@ templates.env.filters["money"] = format_money
 
 APP_TIMEZONE = ZoneInfo("Africa/Harare")
 
+
+@pages_router.get(
+    "/suppliers/{supplier_id}/statement",
+    response_class=HTMLResponse,
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))],
+)
+async def supplier_statement(
+    supplier_id: int,
+    request: Request,
+    user: Annotated[dict, Depends(get_current_user)],
+    db: db_dependency,
+):
+    supplier = (
+        db.query(Contact)
+        .filter(Contact.id == supplier_id, Contact.contact_type == "supplier")
+        .first()
+    )
+    if supplier is None:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    purchases = (
+        db.query(Purchases)
+        .filter(Purchases.supplier_id == supplier_id)
+        .order_by(Purchases.id)
+        .all()
+    )
+    transactions = []
+    for purchase in purchases:
+        amount = decimal_value(purchase.total_amount, "purchase total")
+        transactions.append({
+            "created_at": purchase.created_at,
+            "reference": f"PUR-{purchase.id}",
+            "description": "Purchase",
+            "details": "",
+            "debit": amount,
+            "credit": Decimal("0"),
+        })
+
+    purchase_ids = [purchase.id for purchase in purchases]
+    payments = (
+        db.query(SupplierPayments)
+        .filter(SupplierPayments.purchase_id.in_(purchase_ids))
+        .order_by(SupplierPayments.id)
+        .all()
+        if purchase_ids
+        else []
+    )
+    for payment in payments:
+        transactions.append({
+            "created_at": payment.created_at,
+            "reference": f"PAY-{payment.id}",
+            "description": "Payment made",
+            "details": payment.payment_method.replace("_", " ").title(),
+            "debit": Decimal("0"),
+            "credit": decimal_value(payment.amount, "supplier payment"),
+        })
+
+    transactions.sort(key=lambda row: str(row["created_at"] or ""))
+    balance = Decimal("0")
+    for transaction in transactions:
+        balance += transaction["debit"] - transaction["credit"]
+        transaction["balance"] = balance
+        value = transaction["created_at"]
+        if isinstance(value, str):
+            try:
+                value = datetime.fromisoformat(value)
+            except ValueError:
+                pass
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            transaction["date"] = value.astimezone(APP_TIMEZONE).strftime("%d/%m/%Y %H:%M")
+        else:
+            transaction["date"] = str(value or "N/A")
+
+    return templates.TemplateResponse(
+        request,
+        "supplier_statement.html",
+        {
+            "user": user,
+            "supplier": supplier,
+            "transactions": transactions,
+            "balance_due": max(balance, Decimal("0")),
+            "statement_date": datetime.now(APP_TIMEZONE),
+        },
+    )
+
 def serialize_timestamp(value: datetime | str | None) -> str | None:
     if value is None:
         return None

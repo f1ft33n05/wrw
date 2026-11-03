@@ -36,6 +36,15 @@
             {% endfor %}
           </select>
         </label>
+        <label>
+          Event
+          <select name="event_id">
+            <option value="">Store sale</option>
+            {% for event in events %}
+            <option value="{{ event.id }}" {% if selected_event_id == event.id %}selected{% endif %}>{{ event.name }}{% if event.venue %} — {{ event.venue }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </label>
       </div>
 
       <div class="grid">

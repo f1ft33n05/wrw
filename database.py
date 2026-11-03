@@ -31,6 +31,31 @@ def get_db():
 db_dependency = Annotated[Session, Depends(get_db)]
 
 def ensure_sales_columns(database_engine: Engine) -> None:
+    document_columns = {
+        "document_number": "VARCHAR",
+        "issue_date": "VARCHAR",
+        "due_date": "VARCHAR",
+        "expiry_date": "VARCHAR",
+        "notes": "VARCHAR",
+        "subtotal": "VARCHAR",
+        "tax_rate": "VARCHAR",
+        "tax_amount": "VARCHAR",
+        "discount_amount": "VARCHAR",
+        "currency": "VARCHAR",
+        "created_by": "INTEGER",
+        "event_id": "INTEGER",
+    }
+    for table in ("quotations", "invoices"):
+        if inspect(database_engine).has_table(table):
+            existing = {column["name"] for column in inspect(database_engine).get_columns(table)}
+            applicable = dict(document_columns)
+            if table != "quotations":
+                applicable.pop("expiry_date")
+            missing = {name: sql_type for name, sql_type in applicable.items() if name not in existing}
+            if missing:
+                with database_engine.begin() as connection:
+                    for name, sql_type in missing.items():
+                        connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}"))
     inspector = inspect(database_engine)
     if inspector.has_table("sales_txns"):
         columns = {column["name"] for column in inspector.get_columns("sales_txns")}
@@ -103,6 +128,31 @@ def ensure_sales_columns(database_engine: Engine) -> None:
                     "DROP CONSTRAINT IF EXISTS uq_reseller_reconciliation_period"
                 )
             )
+
+    if inspector.has_table("invoices"):
+        columns = {column["name"] for column in inspector.get_columns("invoices")}
+        if "event_id" not in columns:
+            with database_engine.begin() as connection:
+                connection.execute(text("ALTER TABLE invoices ADD COLUMN event_id INTEGER"))
+
+    if inspector.has_table("sales_txns"):
+        columns = {column["name"] for column in inspector.get_columns("sales_txns")}
+        if "event_id" not in columns:
+            with database_engine.begin() as connection:
+                connection.execute(text("ALTER TABLE sales_txns ADD COLUMN event_id INTEGER"))
+
+    if inspector.has_table("events"):
+        columns = {column["name"] for column in inspector.get_columns("events")}
+        missing_columns = {
+            "name": "VARCHAR",
+            "venue": "VARCHAR",
+            "starts_at": "VARCHAR",
+            "ends_at": "VARCHAR",
+        }
+        with database_engine.begin() as connection:
+            for name, column_type in missing_columns.items():
+                if name not in columns:
+                    connection.execute(text(f"ALTER TABLE events ADD COLUMN {name} {column_type}"))
 
 
 def init_db():

@@ -74,6 +74,7 @@ class SalesTxn(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer)
+    event_id = Column(Integer, index=True)
     invoice_id = Column(Integer)
     item_id = Column(Integer)
     quantity = Column(String)
@@ -210,6 +211,10 @@ class Events(Base):
     __tablename__ = "events"
 
     id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    venue = Column(String)
+    starts_at = Column(String)
+    ends_at = Column(String)
     event_type = Column(String)
     description = Column(String)
     status = Column(String)
@@ -221,6 +226,18 @@ class Quotations(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer)
+    event_id = Column(Integer, index=True)
+    document_number = Column(String, unique=True, index=True)
+    issue_date = Column(String)
+    expiry_date = Column(String)
+    due_date = Column(String)
+    notes = Column(String)
+    subtotal = Column(String)
+    tax_rate = Column(String)
+    tax_amount = Column(String)
+    discount_amount = Column(String)
+    currency = Column(String, default="MWK")
+    created_by = Column(Integer)
     items = Column(String)  # JSON string of items, quantities and unit prices
     total_price = Column(String)
     status = Column(String)  # e.g., "pending", "approved", "rejected"
@@ -232,6 +249,17 @@ class Invoices(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer)
+    event_id = Column(Integer, index=True)
+    document_number = Column(String, unique=True, index=True)
+    issue_date = Column(String)
+    due_date = Column(String)
+    notes = Column(String)
+    subtotal = Column(String)
+    tax_rate = Column(String)
+    tax_amount = Column(String)
+    discount_amount = Column(String)
+    currency = Column(String, default="MWK")
+    created_by = Column(Integer)
     items = Column(String)  # JSON string of items, quantities and unit prices
     total_price = Column(String)
     status = Column(String)  # e.g., "unpaid", "paid", "overdue"

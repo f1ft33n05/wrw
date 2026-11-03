@@ -17,7 +17,9 @@ from database_models import (
     ResellerPayments,
     ResellerReconciliations,
     ResellerReconciliationLines,
+    ResellerTxns,
     StockMvt,
+    User,
 )
 from models import (
     ResellerAllocationRequest,
@@ -224,6 +226,136 @@ async def reseller_page(
             "balance_due": max(total_due - total_paid, Decimal("0")),
             "current_date": current_date,
             "display_timestamp": _display_timestamp,
+        },
+    )
+
+
+@router.get(
+    "/resellers/{reseller_id}/statement",
+    response_class=HTMLResponse,
+    dependencies=[
+        Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))
+    ],
+)
+async def reseller_statement(
+    reseller_id: int,
+    request: Request,
+    user: user_dependency,
+    db: db_dependency,
+):
+    reseller = (
+        db.query(Contact)
+        .filter(Contact.id == reseller_id, Contact.contact_type == "reseller")
+        .first()
+    )
+    if reseller is None:
+        raise HTTPException(status_code=404, detail="Reseller not found")
+
+    transactions = []
+
+    allocations = (
+        db.query(ResellerAllocations)
+        .filter(ResellerAllocations.reseller_id == reseller_id)
+        .all()
+    )
+    allocation_ids = [allocation.id for allocation in allocations]
+    allocation_lines = (
+        db.query(ResellerAllocationLines)
+        .filter(ResellerAllocationLines.allocation_id.in_(allocation_ids))
+        .all()
+        if allocation_ids
+        else []
+    )
+    item_ids = {line.item_id for line in allocation_lines}
+    items = db.query(Item).filter(Item.id.in_(item_ids)).all() if item_ids else []
+    item_names = {item.id: item.name for item in items}
+    allocation_line_count = {}
+    for line in allocation_lines:
+        allocation_line_count[line.allocation_id] = allocation_line_count.get(line.allocation_id, 0) + 1
+    for allocation in allocations:
+        transactions.append({
+            "created_at": allocation.created_at,
+            "reference": f"ALLOC-{allocation.id}",
+            "description": f"{allocation_line_count.get(allocation.id, 0)} stock item(s) allocated",
+            "details": ", ".join(
+                item_names[line.item_id]
+                for line in allocation_lines
+                if line.allocation_id == allocation.id
+            ),
+            "debit": Decimal("0"),
+            "credit": Decimal("0"),
+        })
+
+    reconciliations = (
+        db.query(ResellerReconciliations)
+        .filter(ResellerReconciliations.reseller_id == reseller_id)
+        .all()
+    )
+    for reconciliation in reconciliations:
+        amount = decimal_value(reconciliation.total_due, "reconciliation total")
+        transactions.append({
+            "created_at": reconciliation.created_at,
+            "reference": f"REC-{reconciliation.id}",
+            "description": "Reconciliation charge",
+            "details": reconciliation.reconciliation_date or reconciliation.period,
+            "debit": amount,
+            "credit": Decimal("0"),
+        })
+
+    payments = (
+        db.query(ResellerPayments)
+        .filter(ResellerPayments.reseller_id == reseller_id)
+        .all()
+    )
+    for payment in payments:
+        transactions.append({
+            "created_at": payment.created_at,
+            "reference": f"PAY-{payment.id}",
+            "description": "Payment received",
+            "details": payment.payment_method.replace("_", " ").title(),
+            "debit": Decimal("0"),
+            "credit": decimal_value(payment.amount, "reseller payment"),
+        })
+
+    legacy_transactions = (
+        db.query(ResellerTxns)
+        .filter(ResellerTxns.reseller_id == reseller_id)
+        .all()
+    )
+    for transaction in legacy_transactions:
+        transactions.append({
+            "created_at": transaction.created_at,
+            "reference": f"TXN-{transaction.id}",
+            "description": "Reseller transaction",
+            "details": transaction.payment_method or "",
+            "debit": (
+                decimal_value(transaction.total_price, "reseller transaction")
+                if transaction.total_price not in (None, "")
+                else Decimal("0")
+            ),
+            "credit": Decimal("0"),
+        })
+
+    def transaction_sort_key(transaction):
+        value = transaction["created_at"]
+        return str(value or "")
+
+    transactions.sort(key=transaction_sort_key)
+    balance = Decimal("0")
+    for transaction in transactions:
+        balance += transaction["debit"] - transaction["credit"]
+        transaction["balance"] = balance
+        transaction["date"] = _display_timestamp(transaction["created_at"])
+
+    return templates.TemplateResponse(
+        request,
+        "reseller_statement.html",
+        {
+            "user": user,
+            "reseller": reseller,
+            "transactions": transactions,
+            "balance_due": max(balance, Decimal("0")),
+            "statement_date": datetime.now(APP_TIMEZONE),
         },
     )
 
@@ -567,5 +699,66 @@ async def record_reseller_payment(
     db.commit()
     return {
         "message": "Reseller payment recorded",
+        "payment_id": payment.id,
+        "receipt_url": f"/reseller_pg/payments/{payment.id}/receipt",
         "balance_due": str(balance - amount),
     }
+
+
+@router.get(
+    "/reseller_pg/payments/{payment_id}/receipt",
+    response_class=HTMLResponse,
+    status_code=status.HTTP_200_OK,
+    dependencies=[RESELLER_ACCESS],
+)
+async def reseller_payment_receipt(
+    payment_id: int,
+    request: Request,
+    user: user_dependency,
+    db: db_dependency,
+):
+    payment = (
+        db.query(ResellerPayments)
+        .filter(ResellerPayments.id == payment_id)
+        .first()
+    )
+    if payment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reseller payment receipt not found",
+        )
+
+    reseller = (
+        db.query(Contact)
+        .filter(Contact.id == payment.reseller_id, Contact.contact_type == "reseller")
+        .first()
+    )
+    if reseller is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reseller not found",
+        )
+
+    collector = (
+        db.query(User)
+        .filter(User.id == payment.recorded_by)
+        .first()
+        if payment.recorded_by is not None
+        else None
+    )
+    amount = decimal_value(payment.amount, "reseller payment")
+    balance_due = _balance_due(db, reseller.id)
+
+    return templates.TemplateResponse(
+        request,
+        "reseller_payment_receipt.html",
+        {
+            "user": user,
+            "payment": payment,
+            "reseller": reseller,
+            "collector": collector,
+            "amount": amount,
+            "balance_due": balance_due,
+            "payment_date": _display_timestamp(payment.created_at),
+        },
+    )

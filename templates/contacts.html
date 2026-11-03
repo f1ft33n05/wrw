@@ -41,6 +41,12 @@
           <td>{{ contact_balances[contact.id]|money }}</td>
           {% if user.role in ["admin", "manager"] %}
           <td>
+            {% if contact_type == "reseller" %}
+            <a role="button" class="secondary" href="/resellers/{{ contact.id }}/statement">Statement</a>
+            {% endif %}
+            {% if contact_type == "supplier" %}
+            <a role="button" class="secondary" href="/suppliers/{{ contact.id }}/statement">Statement</a>
+            {% endif %}
             <button type="button" data-edit-contact
               data-contact-id="{{ contact.id }}"
               data-contact-name="{{ contact.name }}"
