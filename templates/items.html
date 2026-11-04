@@ -1,32 +1,151 @@
 {% include "header.html" %}
 <body>
-<div class="container row">
-  {% include "sidebar.html" %}
-  <div class="col-xs-12 col-md-9">
-<main class="container items-page">
-  <header><a href="/dashboard">Dashboard</a></header>
-  <h1>Items</h1>
-  <div class="grid"><details><summary>Add item</summary>
-    <form id="item-create-form">
-      <label>Name <input name="name" required></label><label>Barcode <input name="barcode" required></label>
-      <label>Category <select name="category_id"><option value="">Uncategorised</option>{% for category in categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</select></label>
-      <label>Unit <input name="unit" required></label><label>Initial quantity <input name="quantity" type="number" step="0.01" min="0" value="0"></label>
-      <label>Purchase price <input name="purchase_price" type="number" step="0.01" min="0" required></label>
-      <label>Wholesale price <input name="selling_price_wholesale" type="number" step="0.01" min="0" required></label>
-      <label>Retail price <input name="selling_price_retail" type="number" step="0.01" min="0" required></label>
-      <label>Wholesale threshold <input name="wholesale_threshold" type="number" step="0.01" min="0.01" value="6"></label>
-      <p id="item-create-error" role="alert"></p><button>Add item</button>
-    </form>
-  </details><a role="button" href="/items/import/page">Import Excel</a><a role="button" href="/items/categories">Categories</a><a role="button" href="/items/discounts">Discounts</a></div>
-  <div class="overflow-auto"><table class="striped"><thead><tr><th>Name</th><th>Barcode</th><th>Category</th><th>Stock</th><th>Unit</th><th>Purchase</th><th>Wholesale</th><th>Retail</th><th>Actions</th></tr></thead><tbody>
-  {% for item in items %}<tr><td>{{ item.name }}</td><td>{{ item.barcode }}</td><td>{{ category_names.get(item.category_id, "Uncategorised") }}</td><td>{{ item.quantity }}</td><td>{{ item.unit }}</td><td>{{ item.purchase_price }}</td><td>{{ item.selling_price_wholesale }}</td><td>{{ item.selling_price_retail }}</td><td>
-    <button type="button" data-edit-item data-id="{{ item.id }}" data-name="{{ item.name }}" data-barcode="{{ item.barcode }}" data-category="{{ item.category_id or '' }}" data-unit="{{ item.unit }}" data-quantity="{{ item.quantity }}" data-purchase="{{ item.purchase_price }}" data-wholesale="{{ item.selling_price_wholesale }}" data-retail="{{ item.selling_price_retail }}" data-description="{{ item.description or '' }}" data-threshold="{{ item.wholesale_threshold }}">Edit</button>
-    <button type="button" data-add-stock="{{ item.id }}">Add stock</button><button type="button" class="secondary" data-delete-item="{{ item.id }}">Delete</button></td></tr>{% else %}<tr><td colspan="9">No items found.</td></tr>{% endfor %}
-  </tbody></table></div>
-  <dialog id="item-edit-dialog"><article><h2>Edit item</h2><form id="item-edit-form"><label>Name <input name="name" required></label><label>Barcode <input name="barcode" required></label><label>Description <input name="description"></label><label>Category <select name="category_id"><option value="">Uncategorised</option>{% for category in categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</select></label><label>Unit <input name="unit" required></label><label>Stock quantity <input name="quantity" type="number" step="0.01" min="0" required></label><label>Purchase price <input name="purchase_price" type="number" step="0.01" min="0" required></label><label>Wholesale price <input name="selling_price_wholesale" type="number" step="0.01" min="0" required></label><label>Retail price <input name="selling_price_retail" type="number" step="0.01" min="0" required></label><label>Wholesale threshold <input name="wholesale_threshold" type="number" step="0.01" min="0.01" required></label><p id="item-edit-error" role="alert"></p><footer><button type="button" class="secondary" data-cancel-item-edit>Cancel</button><button>Save</button></footer></form></article></dialog>
-  <dialog id="stock-dialog"><article><h2>Add stock</h2><form id="stock-form"><label>Quantity to add <input name="quantity" type="number" step="0.01" min="0.01" required></label><label>Reason <input name="reason" value="Stock received"></label><p id="stock-error" role="alert"></p><footer><button type="button" class="secondary" data-cancel-stock>Cancel</button><button>Add stock</button></footer></form></article></dialog>
-</main>
-</div>
-</div>
+  <header>
+      <nav>
+          <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-light.png') }}" alt="We are Wines Logo"></a></div>
+          <ul>
+              <li>
+              <details class="dropdown">
+                  <summary id="user-avatar">
+                    <img src="{{ url_for('static', path='images/user-avatar.png') }}" alt="We are Wines Logo">
+                  </summary>
+                  <ul dir="rtl">
+                  <li><a href="#">Profile</a></li>
+                  <li><a href="#">Settings</a></li>
+                  <li><a href="#">Logout</a></li>
+                  </ul>
+              </details>
+              </li>
+          </ul>
+      </nav>
+  </header>
+  <div class="content-container row">
+    {% include "sidebar.html" %}
+    <div class="col-xs-12 col-md-9">
+      <main class="items-page">
+          <h1>Items</h1>          
+          <article class="item-create-form-container">
+              <details>
+                  <summary>Add +</summary>
+                  <form id="item-create-form">
+                    <div class="row">
+                      <label class="col-md-4">Name <input name="name" required></label>
+                      <label class="col-md-4">Barcode <input name="barcode" required></label>
+                      <label class="col-md-4">Category <select name="category_id"><option value="">Uncategorised</option>{% for category in categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</select></label>
+                    
+                    </div>
+                    <div class="row">
+                      <label class="col-md-4">Unit <input name="unit" required></label>
+                    <label class="col-md-4">Initial quantity <input name="quantity" type="number" step="0.01" min="0" value="0"></label>
+                    <label class="col-md-4">Purchase price <input name="purchase_price" type="number" step="0.01" min="0" required></label>
+                    
+                    </div>
+                    <div class="row">
+                      <label class="col-md-4">Wholesale price <input name="selling_price_wholesale" type="number" step="0.01" min="0" required></label>
+                    <label class="col-md-4">Retail price <input name="selling_price_retail" type="number" step="0.01" min="0" required></label>
+                    <label class="col-md-4">Wholesale threshold <input name="wholesale_threshold" type="number" step="0.01" min="0.01" value="6"></label>
+                    
+                    </div>
+                    <p id="item-create-error" role="alert"></p>
+                    <button>Add Item</button>
+                  </form>
+              </details>
+          </article>
+          <div class="overflow-auto">
+            <table class="striped all-items-list">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Barcode</th>
+                  <th>Category</th>
+                  <th>Stock</th>
+                  <th>Unit</th>
+                  <th>Purchase</th>
+                  <th>Wholesale</th>
+                  <th>Retail</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+              {% for item in items %}
+              <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.barcode }}</td>
+                <td>{{ category_names.get(item.category_id, "Uncategorised") }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.unit }}</td>
+                <td>{{ item.purchase_price }}</td>
+                <td>{{ item.selling_price_wholesale }}</td>
+                <td>{{ item.selling_price_retail }}</td>
+                <td>
+                  <button type="button" data-edit-item data-id="{{ item.id }}" data-name="{{ item.name }}" data-barcode="{{ item.barcode }}" data-category="{{ item.category_id or '' }}" data-unit="{{ item.unit }}" data-quantity="{{ item.quantity }}" data-purchase="{{ item.purchase_price }}" data-wholesale="{{ item.selling_price_wholesale }}" data-retail="{{ item.selling_price_retail }}" data-description="{{ item.description or '' }}" data-threshold="{{ item.wholesale_threshold }}">Edit</button>
+                  <button type="button" data-add-stock="{{ item.id }}">Add stock</button>
+                  <button type="button" class="secondary" data-delete-item="{{ item.id }}">Delete</button>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="9">No items found.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+          <dialog id="item-edit-dialog">
+            <article>
+              <h2>Edit item</h2>
+              <form id="item-edit-form">
+                <div class="row">
+                  <label class="col-md-6">Name <input name="name" required></label>
+                  <label class="col-md-6">Barcode <input name="barcode" required></label>
+
+                </div>
+                <div class="row">
+                    <label class="col-md-6">Description <input name="description"></label>
+                    <label class="col-md-6">Category <select name="category_id"><option value="">Uncategorised</option>{% for category in categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</select></label>
+
+                </div>
+                <div class="row">
+                    <label class="col-md-6">Unit <input name="unit" required></label>
+                    <label class="col-md-6">Stock quantity <input name="quantity" type="number" step="0.01" min="0" required></label>
+
+                </div>
+                <div class="row">
+                  <label class="col-md-6">Purchase price <input name="purchase_price" type="number" step="0.01" min="0" required></label>
+                  <label class="col-md-6">Wholesale price <input name="selling_price_wholesale" type="number" step="0.01" min="0" required></label>
+
+                </div>
+                <div class="row">
+                  <label class="col-md-6">Retail price <input name="selling_price_retail" type="number" step="0.01" min="0" required></label>
+                  <label class="col-md-6">Wholesale threshold <input name="wholesale_threshold" type="number" step="0.01" min="0.01" required></label>
+
+                </div>
+                <p id="item-edit-error" role="alert"></p>
+                <footer class="row">
+                  <button type="button" class="secondary col-md-2" data-cancel-item-edit>Cancel</button>
+                  <div class="spacer col-md-1"></div>
+                  <button type="submit" class="col-md-2">Save</button>
+                  <div class="spacer col-md-7"></div>
+                </footer>
+              </form>
+            </article>
+          </dialog>
+          <dialog id="stock-dialog">
+            <article>
+              <h2>Add stock</h2>
+              <form id="stock-form">
+                <label>Quantity to add <input name="quantity" type="number" step="0.01" min="0.01" required></label>
+                <label>Reason <input name="reason" value="Stock received"></label>
+                <p id="stock-error" role="alert"></p>
+                <footer>
+                  <button type="button" class="secondary" data-cancel-stock>Cancel</button>
+                  <button>Add stock</button>
+                </footer>
+              </form>
+            </article>
+          </dialog>
+      </main>
+    </div>
+  </div>
 <script src="{{ url_for('static', path='js/items.js') }}"></script>
 </body></html>

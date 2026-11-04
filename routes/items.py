@@ -363,6 +363,22 @@ async def update_item(item_id: int, update_item_request: CreateItemRequest, db: 
     item.updated_at = datetime.now(timezone.utc)
 
     db.commit()
+    db.refresh(item)
+    return CreateItemRequest(
+        id=item.id,
+        name=item.name,
+        description=item.description,
+        barcode=item.barcode,
+        purchase_price=item.purchase_price,
+        selling_price_wholesale=item.selling_price_wholesale,
+        selling_price_retail=item.selling_price_retail,
+        wholesale_threshold=item.wholesale_threshold or "6",
+        quantity=item.quantity,
+        unit=item.unit,
+        category_id=item.category_id,
+        created_at=serialize_timestamp(item.created_at),
+        updated_at=serialize_timestamp(item.updated_at),
+    )
 
 @router.delete(
     "/{item_id}",

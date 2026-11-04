@@ -1,11 +1,42 @@
 {% include "header.html" %}
 <body>
-<div class="container row">
-  {% include "sidebar.html" %}
-  <div class="col-xs-12 col-md-9">
-    <main class="container items-page"><header><a href="/items">Items</a></header><h1>Import items from Excel</h1><p><a role="button" href="/items/import/template" download>Download Excel template</a></p><p>Upload an .xlsx or .xlsm file. Required columns: <code>name</code>, <code>barcode</code>, <code>purchase_price</code>, <code>selling_price_retail</code>, <code>selling_price_wholesale</code>, and <code>unit</code>. Optional columns: <code>quantity</code>, <code>wholesale_threshold</code>, <code>category</code>, and <code>description</code>.</p><form id="item-import-form" enctype="multipart/form-data"><label>Excel file <input name="file" type="file" accept=".xlsx,.xlsm" required></label><button>Import items</button></form><p id="import-result" role="status"></p><p id="import-error" role="alert"></p></main>
+    <header>
+      <nav>
+          <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-light.png') }}" alt="We are Wines Logo"></a></div>
+          <ul>
+              <li>
+              <details class="dropdown">
+                  <summary id="user-avatar">
+                    <img src="{{ url_for('static', path='images/user-avatar.png') }}" alt="We are Wines Logo">
+                  </summary>
+                  <ul dir="rtl">
+                  <li><a href="#">Profile</a></li>
+                  <li><a href="#">Settings</a></li>
+                  <li><a href="#">Logout</a></li>
+                  </ul>
+              </details>
+              </li>
+          </ul>
+      </nav>
+  </header>
+  <div class="content-container row">
+    {% include "sidebar.html" %}
+    <div class="col-xs-12 col-md-9">
+      <main class="items-import-page">
+        <div class="title">
+          <h1>Import items from Excel</h1>
+        </div>
+        <p><a role="button" href="/items/import/template" download>Download Template</a></p>
+        <p class="upload-hint">Upload an .xlsx or .xlsm file. Required columns: <code>name</code>, <code>barcode</code>, <code>purchase_price</code>, <code>selling_price_retail</code>, <code>selling_price_wholesale</code>, and <code>unit</code>. Optional columns: <code>quantity</code>, <code>wholesale_threshold</code>, <code>category</code>, and <code>description</code>.</p>
+        <form id="item-import-form" enctype="multipart/form-data">
+          <label><input name="file" type="file" accept=".xlsx,.xlsm" required></label>
+          <button>Import Items</button>
+        </form>
+        <p id="import-result" role="status"></p>
+        <p id="import-error" role="alert"></p>
+      </main>
+    </div>
   </div>
-</div>
 <script src="{{ url_for('static', path='js/items_import.js') }}"></script>
 </body>
 </html>

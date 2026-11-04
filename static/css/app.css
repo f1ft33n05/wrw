@@ -233,6 +233,113 @@ details.dropdown>summary+ul {
     font-size: 1.6rem;
 }
 
+/* ITEMS */
+.items-import-page h1, .items-page h1 {
+    font-size: 2.4rem;
+    margin-bottom: 2rem;
+    text-align: left;
+}
+
+.items-page summary {
+    width: fit-content;
+    background-color: var(--pico-primary);
+    color: #fff;
+    padding: 1.4rem 2rem;
+    border-radius: 0.5rem;
+    font-size: 1.6rem;
+}
+
+.items-page summary::after {
+    display : none;
+}
+
+.items-page tbody tr td {
+    font-size: 1.6rem;
+}
+
+.all-items-list button {
+    font-size: 1.2rem;
+    padding: 0.5rem 1rem;
+    margin-top: 0.5rem;
+
+
+}
+
+.items-import-page a {
+    font-size: 1.6rem;
+    margin-bottom: 2rem;
+}
+
+.items-import-page .upload-hint {
+    font-size: 1.6rem;
+    margin-bottom: 2rem;
+}
+
+.items-import-page form input::file-selector-button {
+    font-size: 1.6rem;
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.5rem;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    background-color: var(--pico-primary);
+}
+
+.items-import-page input[type="file"] {
+    font-size: 1.6rem;
+    margin-bottom: 2rem;
+}
+
+.item-create-form-container {
+    margin-top: 2rem;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.item-create-form-container details {
+    margin: 0
+}
+#item-import-form button {
+    font-size: 1.6rem;
+    margin-top: 2rem;
+}
+
+#item-create-form, #item-edit-form {
+    margin-top: 2rem;
+}
+
+#item-create-form button, #item-edit-form button, #stock-form button, #category-form button, #discount-form button {
+    font-size: 1.6rem;
+    margin-top: 2rem;
+}
+
+#item-create-form input, #item-edit-form input, #stock-form input, #category-form input, #discount-form input {
+    font-size: 1.6rem;
+    margin-bottom: 1rem;
+    padding: 2rem 1rem;
+}
+
+#item-create-form select, #item-edit-form select {
+    font-size: 1.6rem;
+}
+
+#item-create-form label, #item-edit-form label, #stock-form label, #category-form label, #discount-form label {
+    font-size: 1.6rem;
+}
+
+#item-edit-dialog article, #item-delete-dialog article, #stock-dialog article {
+    padding: 4rem;
+}
+
+#item-edit-dialog article h2, #item-delete-dialog article h2, #stock-dialog article h2 {
+    font-size: 2.4rem;
+    margin-bottom: 2rem;
+}
+
+/* SELL */
+
+
+
 /* SIDEBAR */
 
 aside {

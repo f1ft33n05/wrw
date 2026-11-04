@@ -1,30 +1,70 @@
 {% include "header.html" %}
 <body>
-<div class="container row">
-  {% include "sidebar.html" %}
-  <div class="col-xs-12 col-md-9">
-<main class="container items-page">
-  <header><a href="/items">Items</a><a href="/items/discounts">Discounts</a></header>
-  <h1>Categories</h1>
-  <form id="category-form">
-    <label>Name <input name="name" required></label>
-    <label>Description <input name="description"></label>
-    <p id="category-error" role="alert"></p>
-    <button>Add category</button>
-  </form>
-  <table class="striped">
-    <thead><tr><th>Name</th><th>Description</th></tr></thead>
-    <tbody>
-      {% for category in categories %}
-      <tr><td>{{ category.name }}</td><td>{{ category.description or "" }}</td></tr>
-      {% else %}
-      <tr><td colspan="2">No categories found.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</main>
-</div>
-</div>
+    <header>
+      <nav>
+          <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-light.png') }}" alt="We are Wines Logo"></a></div>
+          <ul>
+              <li>
+              <details class="dropdown">
+                  <summary id="user-avatar">
+                    <img src="{{ url_for('static', path='images/user-avatar.png') }}" alt="We are Wines Logo">
+                  </summary>
+                  <ul dir="rtl">
+                  <li><a href="#">Profile</a></li>
+                  <li><a href="#">Settings</a></li>
+                  <li><a href="#">Logout</a></li>
+                  </ul>
+              </details>
+              </li>
+          </ul>
+      </nav>
+  </header>
+  <div class="content-container row">
+    {% include "sidebar.html" %}
+    <div class="col-xs-12 col-md-9">
+    <main class="items-page">
+        <h1>Categories</h1>
+        <article class="item-create-form-container">
+            <details>
+                <summary>Add +</summary>
+                <form id="category-form">
+                    <label >Name <input name="name" required></label>
+                    <label >Description <input name="description"></label>
+                  
+                  <p id="category-error" role="alert"></p>
+                  <button>Add Category</button>
+                </form>
+            </details>
+        </article>
+        <!-- <form id="category-form">
+          <label>Name <input name="name" required></label>
+          <label>Description <input name="description"></label>
+          <p id="category-error" role="alert"></p>
+          <button>Add category</button>
+        </form> -->
+        <table class="striped">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for category in categories %}
+            <tr>
+              <td>{{ category.name }}</td>
+              <td>{{ category.description or "" }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="2">No categories found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+    </main>
+    </div>
+  </div>
 <script src="{{ url_for('static', path='js/categories.js') }}"></script>
 </body>
 </html>

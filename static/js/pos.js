@@ -4,6 +4,15 @@ const quantityInput = document.querySelector("#item-quantity");
 const cartBody = document.querySelector("#cart-lines");
 const posError = document.querySelector("#pos-error");
 const cart = new Map();
+let checkoutIdempotencyKey = null;
+let checkoutIdempotencyPayload = null;
+
+function createIdempotencyKey() {
+    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") {
+        return globalThis.crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 function compactNumber(value) {
     return new Intl.NumberFormat("en-US", {
@@ -191,12 +200,20 @@ posForm.addEventListener("submit", async (event) => {
         amount_paid: amountPaid,
         payment_method: paymentMethod || null,
     };
+    const serializedPayload = JSON.stringify(payload);
+    if (checkoutIdempotencyPayload !== serializedPayload) {
+        checkoutIdempotencyPayload = serializedPayload;
+        checkoutIdempotencyKey = createIdempotencyKey();
+    }
 
     try {
         const response = await fetch("/sales/create", {
             method: "POST",
             credentials: "same-origin",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                "Idempotency-Key": checkoutIdempotencyKey,
+            },
             body: JSON.stringify(payload),
         });
         if (!response.ok) {
