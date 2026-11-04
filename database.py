@@ -175,6 +175,12 @@ def ensure_sales_columns(database_engine: Engine) -> None:
                 if name not in columns:
                     connection.execute(text(f"ALTER TABLE events ADD COLUMN {name} {column_type}"))
 
+    if inspector.has_table("stock_mvt"):
+        columns = {column["name"] for column in inspector.get_columns("stock_mvt")}
+        if "note" not in columns:
+            with database_engine.begin() as connection:
+                connection.execute(text("ALTER TABLE stock_mvt ADD COLUMN note VARCHAR"))
+
 
 def init_db():
     ensure_sales_columns(engine)

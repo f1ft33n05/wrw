@@ -249,6 +249,15 @@ class EventRequest(BaseModel):
     status: str = "planned"
 
 
+class EventStockLineRequest(BaseModel):
+    item_id: int
+    quantity: Decimal = Field(gt=0)
+
+
+class EventStockAllocationRequest(BaseModel):
+    allocations: list[EventStockLineRequest] = Field(min_length=1)
+
+
 class DocumentLineRequest(BaseModel):
     item_id: int | None = None
     description: str = Field(min_length=1)

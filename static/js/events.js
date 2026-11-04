@@ -59,6 +59,7 @@ function updateCountdown(startValue) {
 }
 
 window.openEventDetails = function (card) {
+        window.eventCardBeingOpened = card;
         const start = parseLocalDate(card.dataset.start);
         document.querySelector("#event-detail-name").textContent = card.dataset.name;
         document.querySelector("#event-detail-venue").textContent = card.dataset.venue || "Location not set";
@@ -85,6 +86,54 @@ window.openEventDetails = function (card) {
 };
 
 document.querySelector("#close-event-dialog")?.addEventListener("click", () => eventDialog?.close());
+
+const assignStockLink = document.querySelector("#assign-event-stock");
+const assignStockDialog = document.querySelector("#assign-event-stock-dialog");
+const assignStockForm = document.querySelector("#assign-event-stock-form");
+const assignStockError = document.querySelector("#assign-event-stock-error");
+
+assignStockLink?.addEventListener("click", (event) => {
+    event.preventEventDefault?.();
+    event.preventDefault();
+    const currentCard = document.querySelector(".event-card:focus") || window.eventCardBeingOpened;
+    document.querySelector("#assign-event-id").value = currentCard?.dataset.id || "";
+    assignStockForm.reset();
+    assignStockError.textContent = "";
+    if (assignStockDialog?.showModal) assignStockDialog.showModal();
+});
+
+assignStockForm?.addEventListener("submit", async (event) => {
+    if (event.submitter?.value !== "default") return;
+    event.preventDefault();
+    assignStockError.textContent = "";
+    const allocations = [...assignStockForm.querySelectorAll("[data-item-id]")]
+        .map((input) => ({
+            item_id: Number(input.dataset.itemId),
+            quantity: Number(input.value),
+        }))
+        .filter((allocation) => Number.isFinite(allocation.quantity) && allocation.quantity > 0);
+    if (!allocations.length) {
+        assignStockError.textContent = "Enter a quantity for at least one item.";
+        return;
+    }
+    const eventId = document.querySelector("#assign-event-id").value;
+    try {
+        const response = await fetch(`/events/${encodeURIComponent(eventId)}/stock`, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ allocations }),
+        });
+        if (!response.ok) {
+            const body = await response.json();
+            throw new Error(body.detail || "Could not assign event stock.");
+        }
+        assignStockDialog.close();
+        window.location.reload();
+    } catch (error) {
+        assignStockError.textContent = error.message;
+    }
+});
 
 if (eventForm) {
     eventForm.addEventListener("submit", async (event) => {

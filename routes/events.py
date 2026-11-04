@@ -7,10 +7,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from database import db_dependency
-from database_models import Events, Invoices, Payments
-from models import EventRequest, Role
+from database_models import EventStockAllocation, Events, Invoices, Item, Payments
+from models import EventRequest, EventStockAllocationRequest, Role
 from routes.auth import RoleChecker, get_current_user
 from routes.ledger_utils import decimal_value, format_money
+from event_stock import return_expired_event_stock
 
 
 router = APIRouter(tags=["events"])
@@ -23,11 +24,13 @@ EVENT_VIEW_ACCESS = Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))
 
 @router.get("/events", response_class=HTMLResponse, dependencies=[EVENT_VIEW_ACCESS])
 async def events_page(request: Request, user: user_dependency, db: db_dependency):
+    return_expired_event_stock(db)
     events = db.query(Events).order_by(Events.starts_at.desc(), Events.name).all()
+    items = db.query(Item).order_by(Item.name).all()
     return templates.TemplateResponse(
         request,
         "events.html",
-        {"user": user, "events": events},
+        {"user": user, "events": events, "stock_items": items},
     )
 
 
@@ -49,6 +52,64 @@ async def create_event(payload: EventRequest, user: user_dependency, db: db_depe
     db.commit()
     db.refresh(event)
     return {"message": "Event created", "event_id": event.id}
+
+
+@router.post("/events/{event_id}/stock", dependencies=[EVENT_ACCESS])
+async def allocate_event_stock(
+    event_id: int,
+    payload: EventStockAllocationRequest,
+    user: user_dependency,
+    db: db_dependency,
+):
+    event = db.query(Events).filter(Events.id == event_id).first()
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    item_ids = [line.item_id for line in payload.allocations]
+    if len(set(item_ids)) != len(item_ids):
+        raise HTTPException(status_code=422, detail="Each item can only be assigned once")
+
+    timestamp = datetime.now(timezone.utc).isoformat()
+    allocated = []
+    for line in payload.allocations:
+        item = db.query(Item).filter(Item.id == line.item_id).first()
+        if item is None:
+            raise HTTPException(status_code=404, detail=f"Item {line.item_id} not found")
+        quantity = decimal_value(str(line.quantity), "allocation quantity")
+        if quantity <= 0:
+            raise HTTPException(status_code=422, detail="Allocation quantity must be positive")
+
+        existing = db.query(EventStockAllocation).filter(
+            EventStockAllocation.event_id == event_id,
+            EventStockAllocation.item_id == item.id,
+            EventStockAllocation.status == "active",
+        ).first()
+        available_quantity = decimal_value(item.quantity or "0", "item quantity")
+        if quantity > available_quantity:
+            raise HTTPException(status_code=409, detail=f"Insufficient unallocated stock for {item.name}")
+
+        if existing is None:
+            db.add(EventStockAllocation(
+                event_id=event_id,
+                item_id=item.id,
+                quantity=str(quantity),
+                quantity_remaining=str(quantity),
+                status="active",
+                allocated_by=user.get("id") if isinstance(user, dict) else getattr(user, "id", None),
+                created_at=timestamp,
+                updated_at=timestamp,
+            ))
+        else:
+            allocated_quantity = decimal_value(existing.quantity, "allocated quantity") + quantity
+            existing.quantity = str(allocated_quantity)
+            existing.quantity_remaining = str(decimal_value(existing.quantity_remaining, "remaining quantity") + quantity)
+            existing.updated_at = timestamp
+        item.quantity = str(available_quantity - quantity)
+        item.updated_at = timestamp
+        allocated.append({"item_id": item.id, "quantity": str(quantity)})
+
+    db.commit()
+    return {"message": "Event stock assigned", "allocations": allocated}
 
 
 @router.get("/events/{event_id}", response_class=HTMLResponse, dependencies=[EVENT_VIEW_ACCESS])
@@ -87,4 +148,3 @@ async def event_detail(event_id: int, request: Request, user: user_dependency, d
             "balance_due": max(total_sales - total_collected, Decimal("0")),
         },
     )
-

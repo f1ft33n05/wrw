@@ -1,0 +1,61 @@
+from datetime import datetime, timezone
+from decimal import Decimal
+
+from database_models import EventStockAllocation, Events, Item, StockMvt
+
+
+def parse_event_timestamp(value: str | None):
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if len(value) == 10:
+        parsed = parsed.replace(hour=23, minute=59, second=59)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def return_expired_event_stock(db, now: datetime | None = None) -> list[dict]:
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    allocations = db.query(EventStockAllocation).filter(
+        EventStockAllocation.status == "active",
+        EventStockAllocation.quantity_remaining != "0",
+    ).with_for_update().all()
+    returned = []
+    timestamp = now.isoformat()
+
+    for allocation in allocations:
+        event = db.query(Events).filter(Events.id == allocation.event_id).with_for_update().first()
+        if event is None:
+            continue
+        ends_at = parse_event_timestamp(event.ends_at or event.starts_at)
+        if ends_at is None or ends_at >= now:
+            continue
+
+        remaining = Decimal(allocation.quantity_remaining)
+        if remaining <= 0:
+            continue
+        item = db.query(Item).filter(Item.id == allocation.item_id).with_for_update().first()
+        if item is None:
+            continue
+        item.quantity = str(Decimal(item.quantity or "0") + remaining)
+        item.updated_at = timestamp
+        allocation.quantity_remaining = "0"
+        allocation.status = "returned"
+        allocation.updated_at = timestamp
+        db.add(StockMvt(
+            item_id=item.id,
+            quantity=str(remaining),
+            movement_type="in",
+            note=f"Returned from Event ({event.id})",
+            created_at=timestamp,
+            updated_at=timestamp,
+        ))
+        returned.append({"event_id": event.id, "item_id": item.id, "quantity": str(remaining)})
+
+    if returned:
+        db.commit()
+    return returned

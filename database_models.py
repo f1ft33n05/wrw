@@ -232,6 +232,7 @@ class StockMvt(Base):
     item_id = Column(Integer)
     quantity = Column(String)
     movement_type = Column(String)  # e.g., "in" or "out"
+    note = Column(String)
     created_at = Column(String)
     updated_at = Column(String)
 
@@ -246,6 +247,20 @@ class Events(Base):
     event_type = Column(String)
     description = Column(String)
     status = Column(String)
+    created_at = Column(String)
+    updated_at = Column(String)
+
+
+class EventStockAllocation(Base):
+    __tablename__ = "event_stock_allocations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_id = Column(Integer, nullable=False, index=True)
+    item_id = Column(Integer, nullable=False, index=True)
+    quantity = Column(String, nullable=False)
+    quantity_remaining = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="active")
+    allocated_by = Column(Integer)
     created_at = Column(String)
     updated_at = Column(String)
 

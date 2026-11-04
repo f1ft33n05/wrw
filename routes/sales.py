@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from starlette import status
 
 from database import db_dependency
-from database_models import Contact, Events, Invoices, Item, ItemDiscount, Payments, SalesTxn, StockMvt, User
+from database_models import Contact, EventStockAllocation, Events, Invoices, Item, ItemDiscount, Payments, SalesTxn, StockMvt, User
 from models import (
     CheckoutRequest,
     PaymentCollectionRequest,
@@ -21,6 +21,7 @@ from routes.auth import RoleChecker, get_current_user
 from config import APP_TIMEZONE as CONFIGURED_TIMEZONE
 from config import CURRENCY_CODE
 from idempotency import get_cached_response, require_idempotency_key, save_response
+from event_stock import return_expired_event_stock
 
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -363,7 +364,26 @@ async def sales_payments(request: Request, user: user_dependency, db: db_depende
     dependencies=[SALES_ACCESS],
 )
 async def pos_screen(request: Request, user: user_dependency, db: db_dependency, event_id: int | None = None):
+    return_expired_event_stock(db)
     items = db.query(Item).order_by(Item.name).all()
+    if event_id is None:
+        items = [
+            {**{column.name: getattr(item, column.name) for column in Item.__table__.columns}, "quantity": str(item.quantity or "0")}
+            for item in items
+            if _decimal(item.quantity or "0", "stock quantity") > 0
+        ]
+    else:
+        allocations = db.query(EventStockAllocation).filter(
+            EventStockAllocation.event_id == event_id,
+            EventStockAllocation.status == "active",
+            EventStockAllocation.quantity_remaining != "0",
+        ).all()
+        allocation_by_item = {allocation.item_id: _decimal(allocation.quantity_remaining, "remaining quantity") for allocation in allocations}
+        items = [
+            {**{column.name: getattr(item, column.name) for column in Item.__table__.columns}, "quantity": str(allocation_by_item[item.id])}
+            for item in items
+            if item.id in allocation_by_item
+        ]
     customers = (
         db.query(Contact)
         .filter(Contact.contact_type == "customer")
@@ -492,6 +512,23 @@ async def create_sale(
         total = Decimal("0")
         for item_id, quantity in quantities.items():
             item = items_by_id[item_id]
+            stock = _decimal(item.quantity or "0", "stock quantity")
+            if checkout.event_id is not None:
+                allocation = db.query(EventStockAllocation).filter(
+                    EventStockAllocation.event_id == checkout.event_id,
+                    EventStockAllocation.item_id == item_id,
+                    EventStockAllocation.status == "active",
+                ).with_for_update().first()
+                if allocation is None:
+                    raise HTTPException(status_code=409, detail=f"{item.name} is not assigned to this event")
+                available = _decimal(allocation.quantity_remaining, "remaining event stock")
+            else:
+                available = stock
+            if quantity > available:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Insufficient available stock for {item.name}; available: {available}",
+                )
             threshold = _decimal(
                 item.wholesale_threshold or "6",
                 "wholesale threshold",
@@ -500,12 +537,6 @@ async def create_sale(
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"{item.name} has an invalid wholesale threshold",
-                )
-            stock = _decimal(item.quantity or "0", "stock quantity")
-            if quantity > stock:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Insufficient stock for {item.name}; available: {stock}",
                 )
             wholesale_quantity = threshold if quantity >= threshold else Decimal("0")
             retail_quantity = quantity - wholesale_quantity
@@ -591,7 +622,21 @@ async def create_sale(
             for item_id, quantity in quantities.items():
                 item = items_by_id[item_id]
                 stock = _decimal(item.quantity or "0", "stock quantity")
-                item.quantity = str(stock - quantity)
+                if checkout.event_id is not None:
+                    allocation = db.query(EventStockAllocation).filter(
+                        EventStockAllocation.event_id == checkout.event_id,
+                        EventStockAllocation.item_id == item_id,
+                        EventStockAllocation.status == "active",
+                    ).with_for_update().first()
+                    if allocation is not None:
+                        allocation.quantity_remaining = str(
+                            _decimal(allocation.quantity_remaining, "remaining event stock") - quantity
+                        )
+                        if Decimal(allocation.quantity_remaining) == 0:
+                            allocation.status = "sold"
+                        allocation.updated_at = timestamp
+                else:
+                    item.quantity = str(stock - quantity)
                 db.add(
                     StockMvt(
                         item_id=item_id,
