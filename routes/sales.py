@@ -29,6 +29,15 @@ user_dependency = Annotated[dict, Depends(get_current_user)]
 APP_TIMEZONE = CONFIGURED_TIMEZONE
 CENT = Decimal("0.01")
 PAYMENT_METHODS = {"cash", "card", "mobile money", "bank transfer"}
+
+
+def _event_starts_on(value: object, target_date) -> bool:
+    if not value:
+        return False
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).date() == target_date
+    except ValueError:
+        return str(value).split("T", 1)[0] == target_date.isoformat()
 SALES_ACCESS = Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))
 
 
@@ -196,6 +205,19 @@ async def list_sales(db: db_dependency):
 )
 async def sales_list(request: Request, user: user_dependency, db: db_dependency):
     invoices = db.query(Invoices).order_by(Invoices.id.desc()).all()
+    items = db.query(Item).order_by(Item.name).all()
+    customers = (
+        db.query(Contact)
+        .filter(Contact.contact_type == "customer")
+        .order_by(Contact.name)
+        .all()
+    )
+    events = (
+        db.query(Events)
+        .filter(Events.status.in_(["planned", "active"]))
+        .order_by(Events.starts_at.desc(), Events.name)
+        .all()
+    )
     event_ids = {invoice.event_id for invoice in invoices if invoice.event_id is not None}
     events = (
         db.query(Events).filter(Events.id.in_(event_ids)).all()
@@ -247,7 +269,14 @@ async def sales_list(request: Request, user: user_dependency, db: db_dependency)
     return templates.TemplateResponse(
         request,
         "sales_list.html",
-        {"user": user, "sales": sales},
+        {
+            "user": user,
+            "sales": sales,
+            "items": items,
+            "customers": customers,
+            "events": events,
+            "selected_event_id": None,
+        },
     )
 
 
@@ -347,10 +376,34 @@ async def pos_screen(request: Request, user: user_dependency, db: db_dependency,
         .order_by(Events.starts_at.desc(), Events.name)
         .all()
     )
+    drafts = [
+        {
+            "id": invoice.id,
+            "line_items": json.loads(invoice.items or "[]"),
+            "total": _decimal(invoice.total_price, "draft total"),
+            "customer_id": invoice.customer_id,
+            "event_id": invoice.event_id,
+            "created_at": _display_timestamp(invoice.created_at),
+        }
+        for invoice in db.query(Invoices).filter(Invoices.status == "draft").order_by(Invoices.id.desc()).all()
+    ]
+    if event_id is not None:
+        selected_event = db.query(Events).filter(Events.id == event_id).first()
+        if selected_event is None:
+            raise HTTPException(status_code=404, detail="Event not found")
+        if not _event_starts_on(selected_event.starts_at, datetime.now(APP_TIMEZONE).date()):
+            raise HTTPException(status_code=409, detail="Event POS opens on the event start date")
     return templates.TemplateResponse(
         request,
         "pos.html",
-        {"user": user, "items": items, "customers": customers, "events": events, "selected_event_id": event_id},
+        {
+            "user": user,
+            "items": items,
+            "customers": customers,
+            "events": events,
+            "drafts": drafts,
+            "selected_event_id": event_id,
+        },
     )
 
 
@@ -376,6 +429,8 @@ async def create_sale(
             raise HTTPException(status_code=404, detail="Event not found")
         if event.status not in {"planned", "active"}:
             raise HTTPException(status_code=409, detail="Sales cannot be closed for this event")
+        if not _event_starts_on(event.starts_at, datetime.now(APP_TIMEZONE).date()):
+            raise HTTPException(status_code=409, detail="Sales can only be created on the event start date")
         checkout.location = f"Event: {event.name}"
 
     if checkout.payment_method is not None:
@@ -498,6 +553,7 @@ async def create_sale(
                 {
                     "item_id": item.id,
                     "name": item.name,
+                    "description": item.name,
                     "quantity": str(quantity),
                     "unit_price": str(unit_price),
                     "total": str(line_total),
@@ -524,52 +580,53 @@ async def create_sale(
             event_id=checkout.event_id,
             items=json.dumps(invoice_lines),
             total_price=str(total),
-            status=_invoice_status(total, amount_paid),
+            status="draft" if checkout.save_draft else _invoice_status(total, amount_paid),
             created_at=timestamp,
             updated_at=timestamp,
         )
         db.add(invoice)
         db.flush()
 
-        for item_id, quantity in quantities.items():
-            item = items_by_id[item_id]
-            stock = _decimal(item.quantity or "0", "stock quantity")
-            item.quantity = str(stock - quantity)
-            db.add(
-                StockMvt(
-                    item_id=item_id,
-                    quantity=str(quantity),
-                    movement_type="out",
-                    created_at=timestamp,
-                    updated_at=timestamp,
+        if not checkout.save_draft:
+            for item_id, quantity in quantities.items():
+                item = items_by_id[item_id]
+                stock = _decimal(item.quantity or "0", "stock quantity")
+                item.quantity = str(stock - quantity)
+                db.add(
+                    StockMvt(
+                        item_id=item_id,
+                        quantity=str(quantity),
+                        movement_type="out",
+                        created_at=timestamp,
+                        updated_at=timestamp,
+                    )
                 )
-            )
-            line = next(
-                invoice_line
-                for invoice_line in invoice_lines
-                if invoice_line["item_id"] == item_id
-            )
-            db.add(
-                SalesTxn(
-                    customer_id=checkout.customer_id,
-                    event_id=checkout.event_id,
-                    invoice_id=invoice.id,
+                line = next(
+                    invoice_line
+                    for invoice_line in invoice_lines
+                    if invoice_line["item_id"] == item_id
+                )
+                db.add(
+                    SalesTxn(
+                        customer_id=checkout.customer_id,
+                        event_id=checkout.event_id,
+                        invoice_id=invoice.id,
                     item_id=item_id,
                     quantity=str(quantity),
-                    unit_price=line["unit_price"],
-                    price_type=line["price_type"],
-                    total_price=line["total"],
-                    discount_percentage=line["discount_percentage"],
-                    discount_amount=line["discount_amount"],
-                    payment_method=checkout.payment_method if amount_paid else None,
-                    added_by=current_user["id"],
-                    location=checkout.location,
+                        unit_price=line["unit_price"],
+                        price_type=line["price_type"],
+                        total_price=line["total"],
+                        discount_percentage=line["discount_percentage"],
+                        discount_amount=line["discount_amount"],
+                        payment_method=checkout.payment_method if amount_paid else None,
+                        added_by=current_user["id"],
+                        location=checkout.location,
                     created_at=timestamp,
                     updated_at=timestamp,
                 )
             )
 
-        if amount_paid > 0:
+        if amount_paid > 0 and not checkout.save_draft:
             db.add(
                 Payments(
                     invoice_id=invoice.id,
@@ -600,6 +657,19 @@ async def create_sale(
     except Exception:
         db.rollback()
         raise
+
+
+@router.delete(
+    "/draft/{invoice_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[SALES_ACCESS],
+)
+async def delete_draft(invoice_id: int, db: db_dependency):
+    invoice = db.query(Invoices).filter(Invoices.id == invoice_id, Invoices.status == "draft").first()
+    if invoice is None:
+        raise HTTPException(status_code=404, detail="Draft sale not found")
+    db.delete(invoice)
+    db.commit()
 
 
 @router.post(
@@ -758,6 +828,10 @@ async def receipt(
                 "name": snapshot.get(
                     "name",
                     current_item.name if current_item is not None else "Item",
+                ),
+                "description": snapshot.get(
+                    "description",
+                    snapshot.get("name", current_item.name if current_item is not None else "Item"),
                 ),
                 "quantity": sale.quantity,
                 "unit_prices": snapshot.get(

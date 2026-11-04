@@ -229,6 +229,7 @@ class CheckoutRequest(BaseModel):
     items: list[SaleLineRequest] = Field(min_length=1)
     amount_paid: Decimal = Field(ge=0)
     payment_method: str | None = None
+    save_draft: bool = False
 
     @field_validator("amount_paid")
     @classmethod

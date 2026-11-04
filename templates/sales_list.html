@@ -22,16 +22,101 @@
   <div class="content-container row">
     {% include "sidebar.html" %}
     <main class="col-xs-12 col-md-9">
-      <article class="all-sales-container">
-        <header>
-          <div class="title">
-            <h1>Sales</h1>
-          </div>
-          <section class="row">
-            <h3>All Sales</h3>
-            <a role="button" class="secondary" href="/sales/pos">New sale</a>
-          </section>
-        </header>
+      <div class="all-sales-container">
+        <h1>Sales</h1>
+        <article class="item-create-form-container">
+            <details>
+                <summary>Add +</summary>
+                <form id="pos-form">
+                    <div class="grid">
+                      <label>
+                        Customer
+                        <select name="customer_id">
+                          <option value="">Walk-in customer</option>
+                          {% for customer in customers %}
+                          <option value="{{ customer.id }}">{{ customer.name }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label>
+                        Event
+                        <select name="event_id">
+                          <option value="">Store sale</option>
+                          {% for event in events %}
+                          <option value="{{ event.id }}" {% if selected_event_id == event.id %}selected{% endif %}>{{ event.name }}{% if event.venue %} — {{ event.venue }}{% endif %}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                    </div>
+
+                    <div class="grid">
+                      <label>
+                        Item
+                        <select id="item-selection">
+                          <option value="">Select an item</option>
+                          {% for item in items %}
+                          <option
+                            value="{{ item.id }}"
+                            data-retail="{{ item.selling_price_retail }}"
+                            data-wholesale="{{ item.selling_price_wholesale }}"
+                            data-wholesale-threshold="{{ item.wholesale_threshold or 6 }}"
+                            data-stock="{{ item.quantity }}"
+                            data-name="{{ item.name }}"
+                          >{{ item.name }} (wholesale threshold: {{ item.wholesale_threshold or 6 }}; stock: {{ item.quantity }})</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label>
+                        Quantity
+                        <input id="item-quantity" type="number" min="1" step="1" value="1">
+                      </label>
+                      <label>
+                        Sale discount (%)
+                        <input id="item-discount" type="number" min="0" max="100" step="0.01" placeholder="Automatic">
+                      </label>
+                      <div>
+                        <label>Unit Price <output id="selected-price">-</output></label>
+                        <button type="button" id="add-to-cart">Add item</button>
+                      </div>
+                    </div>
+
+                    <table>
+                      <thead>
+                        <tr><th>Item</th><th>Qty</th><th>Price Split</th><th>Unit Price</th><th>Line total</th><th></th></tr>
+                      </thead>
+                      <tbody id="cart-lines">
+                        <tr id="empty-cart"><td colspan="6">No items added.</td></tr>
+                      </tbody>
+                    </table>
+                    <p class="text-right"><strong>Total: <span id="sale-total">MWK 0.00</span></strong></p>
+                    <p class="text-right">Change: <span id="sale-change">MWK 0.00</span></p>
+
+                    <div class="grid">
+                      <label>
+                        Amount received (MWK)
+                        <input type="number" name="amount_paid" min="0" step="1.00" value="0.00" required>
+                      </label>
+                      <label>
+                        Payment Method
+                        <select name="payment_method">
+                          <option value="cash">Cash</option>
+                          <option value="card">Card</option>
+                          <option value="mobile money">Mobile money</option>
+                          <option value="bank transfer">Bank transfer</option>
+                        </select>
+                      </label>
+                      <label>
+                        Location
+                        <input name="location" value="store" required>
+                      </label>
+                    </div>
+                    <p id="pos-error" role="alert"></p>
+                    <button type="submit" id="save-draft">Save invoice</button>
+                    <button type="submit" id="complete-sale">Checkout</button>
+                </form>
+            </details>
+        </article>
+        <h2>All Sales</h2>
         <table class="striped">
           <thead>
             <tr>
@@ -44,6 +129,7 @@
               <th scope="col">Balance Due</th>
               <th scope="col">Status</th>
               <th scope="col">Receipt</th>
+              <th scope="col">Payment</th>
             </tr>
           </thead>
           <tbody>
@@ -58,16 +144,24 @@
               <td>{{ sale.balance_due|money }}</td>
               <td>{{ sale.invoice.status|replace("_", " ")|title }}</td>
               <td><a href="/sales/{{ sale.invoice.id }}/receipt">View</a></td>
+              <td>
+                {% if sale.balance_due > 0 %}
+                <button type="button" class="pay-invoice-button" data-invoice-id="{{ sale.invoice.id }}" data-balance="{{ sale.balance_due }}">Record payment</button>
+                {% else %}Paid{% endif %}
+              </td>
             </tr>
             {% else %}
             <tr>
-              <td colspan="9">No sales found.</td>
+              <td colspan="10">No sales found.</td>
             </tr>
             {% endfor %}
           </tbody>
         </table>
-      </article>
+      </div>
     </main>
   </div>
 </body>
+  <script src="{{ url_for('static', path='js/pos.js') }}"></script>
+  <script src="{{ url_for('static', path='js/sales-list.js') }}"></script>
+
 </html>

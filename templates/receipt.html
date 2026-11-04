@@ -28,12 +28,12 @@
         {% if event %}<p>Event: {{ event.name }}{% if event.venue %} — {{ event.venue }}{% endif %}</p>{% endif %}
       <table>
         <thead>
-          <tr><th>Item</th><th>Qty</th><th>Price Split</th><th>Unit Price</th><th>Total</th></tr>
+          <tr><th>Description</th><th>Qty</th><th>Price Split</th><th>Unit Price</th><th>Total</th></tr>
         </thead>
         <tbody>
           {% for line in lines %}
           <tr>
-            <td>{{ line.name }}</td>
+            <td>{{ line.description }}</td>
             <td>{{ line.quantity }}</td>
             <td>{{ line.price_breakdown }}</td>
             <td>{{ line.unit_prices }}</td>

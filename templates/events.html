@@ -1,53 +1,99 @@
 {% include "header.html" %}
 <body>
-  <div class="container row">
-    {% include "sidebar.html" %}
-    <main class="col-xs-12 col-md-9">
-    <header>
+  <header>
       <nav>
-        <ul><li><strong>Events</strong></li></ul>
-        <ul><li><a href="/dashboard">Dashboard</a></li><li><a href="/sales/list">Sales</a></li></ul>
+          <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-light.png') }}" alt="We are Wines Logo"></a></div>
+          <ul>
+              <li>
+              <details class="dropdown">
+                  <summary id="user-avatar">
+                    <img src="{{ url_for('static', path='images/user-avatar.png') }}" alt="We are Wines Logo">
+                  </summary>
+                  <ul dir="rtl">
+                    <li><a href="#">Profile</a></li>
+                    <li><a href="#">Settings</a></li>
+                    <li>
+                      <form action="/auth/logout" method="post">
+                        <button type="submit" class="logout-link">Log out</button>
+                      </form>
+                    </li>
+                  </ul>
+              </details>
+              </li>
+          </ul>
       </nav>
     </header>
-    {% if user.role in ["admin", "manager"] %}
-    <details>
-      <summary>Add event</summary>
-      <form id="event-form">
-        <div class="grid">
-          <label>Name<input name="name" required></label>
-          <label>Venue<input name="venue"></label>
-          <label>Event type<input name="event_type"></label>
-        </div>
-        <div class="grid">
-          <label>Start date<input name="starts_at_date" type="date"></label>
-          <label>Starts at<input name="starts_at_time" type="time"></label>
-          <label>Ends at<input name="ends_at_time" type="time"></label>
-          <label>Status<select name="status"><option>planned</option><option>active</option><option>closed</option><option>cancelled</option></select></label>
-        </div>
-        <label>End date<input name="ends_at_date" type="date"></label>
-        <label>Description<textarea name="description"></textarea></label>
-        <p id="event-error" role="alert"></p>
-        <button type="submit">Create event</button>
-      </form>
-    </details>
-    {% endif %}
-    <table class="striped">
-      <thead><tr><th>Name</th><th>Venue</th><th>Dates</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody>
+  <div class="content-container row">
+    {% include "sidebar.html" %}
+    <main class="col-xs-12 col-md-9">
+      <h1>Events</h1>
+      {% if user.role in ["admin", "manager"] %}
+      <article class="event-create-form-container">
+        <details>
+          <summary>Add +</summary>
+          <form id="event-form">
+            <div class="grid">
+              <label>Name<input name="name" required></label>
+              <label>Venue<input name="venue"></label>
+              <label>Event type<input name="event_type"></label>
+            </div>
+            <div class="grid">
+              <label>Start date<input name="starts_at_date" type="date"></label>
+              <label>Starts at<input name="starts_at_time" type="time"></label>
+              <label>Ends at<input name="ends_at_time" type="time"></label>
+              <label>Status<select name="status"><option>planned</option><option>active</option><option>closed</option><option>cancelled</option></select></label>
+            </div>
+            <label>End date<input name="ends_at_date" type="date"></label>
+            <label>Description<textarea name="description"></textarea></label>
+            <p id="event-error" role="alert"></p>
+            <button type="submit">Save Event</button>
+          </form>
+        </details>
+      </article>
+      {% endif %}
+
+      <section class="events-grid">
         {% for event in events %}
-        <tr>
-          <td>{{ event.name }}</td><td>{{ event.venue or "-" }}</td>
-          <td>{{ event.starts_at or "-" }}{% if event.ends_at %} to {{ event.ends_at }}{% endif %}</td>
-          <td>{{ event.event_type or "-" }}</td><td>{{ event.status|title }}</td>
-          <td><a role="button" href="/events/{{ event.id }}">View sales</a></td>
-        </tr>
+        <button class="event-card" type="button"
+          onclick="openEventDetails(this)"
+          data-id="{{ event.id }}"
+          data-name="{{ event.name }}"
+          data-venue="{{ event.venue or '' }}"
+          data-start="{{ event.starts_at or '' }}"
+          data-end="{{ event.ends_at or '' }}"
+          data-type="{{ event.event_type or '' }}"
+          data-status="{{ event.status or 'planned' }}"
+          data-description="{{ event.description or '' }}">
+          <strong>{{ event.name }}</strong>
+          <span>{{ event.starts_at or "Date not set" }}</span>
+          <small>{{ event.venue or "Location not set" }}</small>
+          <em>{{ event.status|title }}</em>
+        </button>
         {% else %}
-        <tr><td colspan="6">No events found.</td></tr>
+        <p>No events found.</p>
         {% endfor %}
-      </tbody>
-    </table>
+      </section>
+
+      <dialog id="event-detail-dialog" class="event-detail-dialog">
+        <article>
+          <button type="button" id="close-event-dialog" aria-label="Close">×</button>
+          <p hidden id="event-detail-type"></p>
+          <h2 id="event-detail-name"></h2>
+          <p><strong>Location:</strong> <span id="event-detail-venue"></span></p>
+          <p><strong>Date:</strong> <span id="event-detail-date"></span></p>
+          <p id="event-detail-description"></p>
+          <div class="event-countdown">
+            <strong id="event-countdown-value"></strong>
+            <span id="event-countdown-label">Until event</span>
+          </div>
+          <div class="grid event-actions">
+            <a role="button" id="event-view-sales" href="#">View Sales</a>
+            <button type="button" id="event-open-pos" disabled>Open POS</button>
+          </div>
+        </article>
+      </dialog>
   </main>
   </div>
-  <script src="{{ url_for('static', path='js/events.js') }}"></script>
+  <script src="{{ url_for('static', path='js/events.js') }}?v=3"></script>
 </body>
 </html>

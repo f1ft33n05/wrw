@@ -1,118 +1,154 @@
 {% include "header.html" %}
 <body>
-  <main class="">
-      <header>
-        <nav>
-            <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/working--.png') }}" alt="We are Wines Logo"></a></div>
-            <ul>
-                <li><a href="/sales/list">All sales</a></li>
-                <li><a href="/dashboard">Dashboard</a></li>
-                <li>
-                <details class="dropdown">
-                    <summary id="user-avatar">
-                      <img src="{{ url_for('static', path='images/user-avatar.png') }}" alt="We are Wines Logo">
-                    </summary>
-                    <ul dir="rtl">
-                    <li><a href="#">Profile</a></li>
-                    <li><a href="#">Settings</a></li>
-                    <li><a href="#">Logout</a></li>
-                    </ul>
-                </details>
-                </li>
-            </ul>
-        </nav>
+  <header>
+      <nav>
+          <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-light.png') }}" alt="We are Wines Logo"></a></div>
+          <ul>
+              <li>
+              <details class="dropdown">
+                  <summary id="user-avatar">
+                    <img src="{{ url_for('static', path='images/user-avatar.png') }}" alt="We are Wines Logo">
+                  </summary>
+                  <ul dir="rtl">
+                  <li><a href="#">Profile</a></li>
+                  <li><a href="#">Settings</a></li>
+                  <li><a href="#">Logout</a></li>
+                  </ul>
+              </details>
+              </li>
+          </ul>
+      </nav>
     </header>
-
-    <article id="pos-form-container">
-      <h1>New sale</h1>
-    <form id="pos-form">
-      <div class="grid">
-        <label>
-          Customer
-          <select name="customer_id">
-            <option value="">Walk-in customer</option>
-            {% for customer in customers %}
-            <option value="{{ customer.id }}">{{ customer.name }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label>
-          Event
-          <select name="event_id">
-            <option value="">Store sale</option>
-            {% for event in events %}
-            <option value="{{ event.id }}" {% if selected_event_id == event.id %}selected{% endif %}>{{ event.name }}{% if event.venue %} — {{ event.venue }}{% endif %}</option>
-            {% endfor %}
-          </select>
-        </label>
+  <main class="pos-page">
+    <form id="pos-form" class="pos-layout">
+      <div class="pos-qab">
+        <a href="/dashboard">Close POS</a>
       </div>
+        <div class="cart-operations">
+            <section class="pos-cart-panel">
+                <div class="pos-cart-toolbar">
+                    <select name="customer_id" aria-label="Customer">
+                      <option value="">Walk-in customer</option>
+                      {% for customer in customers %}
+                      <option value="{{ customer.id }}">{{ customer.name }}</option>
+                      {% endfor %}
+                    </select>
+                    <input id="pos-search" type="search" list="pos-product-options"  autocomplete="off"
+                      placeholder="Search product by name or SKU...">
+                    <datalist id="pos-product-options">
+                      {% for item in items %}
+                      <option value="{{ item.id }}">{{ item.name }} ({{ item.barcode or 'No SKU' }})</option>
+                      {% endfor %}
+                    </datalist>
+                </div>
+                <input type="hidden" name="event_id" value="{{ selected_event_id or '' }}">
+                <input type="hidden" name="location" value="store">
+              <div class="pos-cart-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Item</th>
+                      <th>Qty</th>
+                      <th>Unit price</th>
+                      <th>Total</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="cart-lines">
+                    <tr id="empty-cart">
+                      <td colspan="5">
+                        <div class="pos-empty-cart">
+                          No items added.<small>Click a product to start a sale.</small>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="pos-cart-summary row">
+                <span class="col-xs-12 col-md-3">Items: <strong id="pos-item-count">0</strong></span>
+                <div class="spacer col-xs-12 col-md-5"></div>
+                <span class="col-xs-12 col-md-4">Subtotal: <strong id="sale-total">MWK 0.00</strong></span>
+              </div>
+            </section>
 
-      <div class="grid">
-        <label>
-          Item
-          <select id="item-selection">
-            <option value="">Select an item</option>
-            {% for item in items %}
-            <option
-              value="{{ item.id }}"
-              data-retail="{{ item.selling_price_retail }}"
-              data-wholesale="{{ item.selling_price_wholesale }}"
-              data-wholesale-threshold="{{ item.wholesale_threshold or 6 }}"
-              data-stock="{{ item.quantity }}"
-              data-name="{{ item.name }}"
-            >{{ item.name }} (wholesale threshold: {{ item.wholesale_threshold or 6 }}; stock: {{ item.quantity }})</option>
+            <div class="products-selection">
+              <aside class="pos-products-panel">
+              <div class="pos-products-heading">Products</div>
+              <div class="pos-product-grid" id="pos-products">
+                {% for item in items %}
+                <button class="pos-product-card" type="button"
+                  data-id="{{ item.id }}"
+                  data-name="{{ item.name }}"
+                  data-barcode="{{ item.barcode or '' }}"
+                  data-retail="{{ item.selling_price_retail }}"
+                  data-wholesale="{{ item.selling_price_wholesale }}"
+                  data-wholesale-threshold="{{ item.wholesale_threshold or 6 }}"
+                  data-stock="{{ item.quantity }}">
+                  <strong>{{ item.name }}</strong>
+                  <small>{{ item.quantity }} in stock</small>
+                  <span>SKU: {{ item.barcode or 'Regular' }}</span>
+                  <b>MWK {{ item.selling_price_retail }}.00</b>
+                </button>
+                {% endfor %}
+              </div>
+            </aside>
+
+            <select id="item-selection" hidden>
+              <option value="">Select an item</option>
+              {% for item in items %}
+              <option value="{{ item.id }}" data-retail="{{ item.selling_price_retail }}" data-wholesale="{{ item.selling_price_wholesale }}" data-wholesale-threshold="{{ item.wholesale_threshold or 6 }}" data-stock="{{ item.quantity }}" data-name="{{ item.name }}">{{ item.name }}</option>
+              {% endfor %}
+            </select>
+            </div>
+            {% if drafts %}
+            <details class="pos-drafts">
+            <summary>Saved sales ({{ drafts|length }})</summary>
+            {% for draft in drafts %}
+            <button type="button" class="resume-sale" data-draft-id="{{ draft.id }}"
+              data-items="{{ draft.line_items|tojson }}"
+              data-customer-id="{{ draft.customer_id or '' }}" data-event-id="{{ draft.event_id or '' }}">
+              Resume #{{ draft.id }} - MWK {{ draft.total }} - {{ draft.created_at }}
+            </button>
             {% endfor %}
-          </select>
-        </label>
-        <label>
-          Quantity
-          <input id="item-quantity" type="number" min="1" step="1" value="1">
-        </label>
-        <label>
-          Sale discount (%)
-          <input id="item-discount" type="number" min="0" max="100" step="0.01" placeholder="Automatic">
-        </label>
-        <div>
-          <label>Unit Price <output id="selected-price">-</output></label>
-          <button type="button" id="add-to-cart">Add item</button>
+            </details>
+            {% endif %}
         </div>
-      </div>
+        <input id="item-quantity" type="hidden" value="1">
+        <input id="item-discount" type="hidden" value="0">
+        <output id="selected-price" hidden>-</output>
+        <button id="add-to-cart" type="button" hidden>Add item</button>
+        <input type="number" name="amount_paid" value="0" hidden>
+        <select name="payment_method" hidden><option value="">Unpaid</option></select>
 
-      <table>
-        <thead>
-          <tr><th>Item</th><th>Qty</th><th>Price Split</th><th>Unit Price</th><th>Line total</th><th></th></tr>
-        </thead>
-        <tbody id="cart-lines">
-          <tr id="empty-cart"><td colspan="6">No items added.</td></tr>
-        </tbody>
-      </table>
-      <p class="text-right"><strong>Total: <span id="sale-total">MWK 0.00</span></strong></p>
-      <p class="text-right">Change: <span id="sale-change">MWK 0.00</span></p>
-
-      <div class="grid">
-        <label>
-          Amount received (MWK)
-          <input type="number" name="amount_paid" min="0" step="1.00" value="0.00" required>
-        </label>
-        <label>
-          Payment Method
-          <select name="payment_method">
-            <option value="cash">Cash</option>
-            <option value="card">Card</option>
-            <option value="mobile money">Mobile money</option>
-            <option value="bank transfer">Bank transfer</option>
-          </select>
-        </label>
-        <label>
-          Location
-          <input name="location" value="store" required>
-        </label>
-      </div>
-      <p id="pos-error" role="alert"></p>
-      <button type="submit" id="complete-sale">Checkout</button>
+        <footer class="pos-actions">
+          <div class="pos-action-buttons">
+            <button type="button" id="cancel-sale" class="pos-cancel">Cancel</button>
+            <button type="button" id="save-sale" class="pos-save">Save Draft</button>
+          </div>
+          <div class="pos-pay-actions">
+            <p>Total <strong id="pos-payable-total">MWK 0.00</strong></p>
+            <button type="button" id="multiple-pay">Multiple pay</button>
+            <button type="button" id="card-pay">Card</button>
+            <button type="button" id="cash-pay">Cash</button>
+          </div>
+        </footer>
     </form>
-    </article>
+    <dialog id="multiple-payment-dialog">
+      <form method="dialog" id="multiple-payment-form">
+        <h3>Split payment</h3>
+        <div id="multiple-payment-rows"></div>
+        <button type="button" id="add-payment-row">Add payment method</button>
+        <p>Remaining: <strong id="multiple-payment-remaining">MWK 0.00</strong></p>
+        <p id="multiple-payment-error" role="alert"></p>
+        <menu>
+          <button value="cancel">Cancel</button>
+          <button id="complete-multiple-payment" value="default">Checkout</button>
+        </menu>
+      </form>
+    </dialog>
+    <p id="pos-error" role="alert"></p>
   </main>
-  <script src="{{ url_for('static', path='js/pos.js') }}"></script>
+  <script src="{{ url_for('static', path='js/pos.js') }}?v=2"></script>
 </body>
 </html>
