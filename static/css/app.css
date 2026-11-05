@@ -17,7 +17,7 @@ h1 {
 }
 
 header nav {
-    width: 80%;
+    width: 90%;
     margin: auto;
 }
 
@@ -54,8 +54,9 @@ tbody {
 .content-container {
     display: flex;
     justify-content: center;
-    width: 80%;
+    width: 100%;
     margin: auto;
+    padding: 2rem;
 }
 
 
@@ -89,7 +90,7 @@ tbody {
 }
 
 .pos-page {
-    width: 80%;
+    width: 90%;
     margin: auto;
     height: calc(100vh - 10rem);
     background: transparent;
@@ -101,6 +102,8 @@ tbody {
     width: 100%;
     gap: 1rem;
     padding: 1rem;
+    flex: 1;
+    min-height: 0;
 }
 
 .pos-cart-panel {
@@ -110,6 +113,7 @@ tbody {
 
 .products-selection {
     flex: 6;
+    min-height: 0;
 }
 
 .pos-actions {
@@ -132,6 +136,7 @@ tbody {
 
 .pos-cart-panel, .pos-products-panel {
     min-height: 0;
+    height: 100%;
     border: 1px solid rgba(3, 111, 212, 0.25);
     border-radius: .5rem;
     background: transparent;
@@ -187,6 +192,22 @@ tbody {
     grid-template-columns: repeat(3, minmax(110px, 1fr));
     gap: .8rem;
     padding: .8rem;
+}
+
+.table-scroll-container {
+  max-height: 60vh;
+  overflow: auto;
+  width: 100%;
+}
+
+.table-scroll-container > table {
+  margin-bottom: 0;
+}
+
+.table-scroll-container table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .pos-product-card {
@@ -254,8 +275,8 @@ tbody {
 }
 
 .authentication-content input {
-    height: 3rem;
-    padding: 1rem 0.5rem;
+    height: 5rem;
+    padding: 1rem;
     margin-bottom: 0;
     font-size: 1.8rem;
 }
@@ -270,17 +291,18 @@ tbody {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 5rem;
+    height: 4rem;
     padding: 2rem;
-    margin-top: 3rem;
+    margin-top: 2rem;
 }
 
 /* DASHBOARD HOME */
 .dashboard-container {
     display: flex;
     justify-content: center;
-    width: 80%;
+    width: 100%;
     margin: auto;
+    padding: 2rem;
 }
 
 .metric-card { 
@@ -327,12 +349,13 @@ tbody {
     border-radius:0.5rem; 
     box-shadow:0 2px 8px rgba(32,40,50,.08); 
     color:#fff; 
-    min-height:96px; 
+    min-height:9rem; 
     padding:.8rem 1rem; 
+    margin-top: 3rem;
 }
 
 .dashboard-chart-card header h2 { 
-    font-size:.95rem; 
+    font-size:1.5rem; 
     margin:0 0 .75rem;
     
 }
@@ -683,6 +706,7 @@ tbody {
 }
 
 /* RECEIPTS */
+
 .receipts-page h1, .payments-page h1 {
     font-size: 2.4rem;
 }
@@ -732,17 +756,53 @@ tbody {
 }
 .supplier-balances h2, .purchase-history h2 {
     margin-bottom: 2rem;
-    
+
 }
 
 
 /* SIDEBAR */
 
-aside {
-    margin-right: 2rem;
-}
-
 aside details ul {
     padding-left: 2rem;
     font-size: 1.6rem;
+}
+
+/* PAGINATION */
+.table-pagination {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: space-between;
+    margin-top: 1.5rem;
+    font-size: 1.5rem;
+}
+.table-pagination label {
+    align-items: center;
+    display: flex;
+    gap: 0.5rem;
+    margin: 0;
+    width: auto;
+}
+.table-pagination select {
+    margin: 0;
+    min-width: 6rem;
+    width: auto;
+}
+.table-pagination-controls {
+    align-items: center;
+    display: flex;
+    gap: 0.35rem;
+}
+.table-pagination button {
+    margin: 0;
+    padding: 0.35rem 0.65rem;
+}
+.table-pagination button[disabled] {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+.table-pagination-summary {
+    color: var(--pico-muted-color);
+    margin: 0;
 }

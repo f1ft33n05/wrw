@@ -35,7 +35,7 @@
       context.moveTo(padding.left, y);
       context.lineTo(rect.width - padding.right, y);
       context.stroke();
-      context.fillStyle = "#667085";
+      context.fillStyle = "#fff";
       context.fillText(formatValue(value), padding.left - 9, y);
     }
 
@@ -50,14 +50,14 @@
       if (index === 0) context.moveTo(x, y);
       else context.lineTo(x, y);
     });
-    context.strokeStyle = "#8e83e8";
+    context.strokeStyle = "#fff";
     context.lineWidth = 2;
     context.stroke();
 
     data.forEach((point, index) => {
       const x = data.length === 1 ? padding.left + chartWidth / 2 : padding.left + index * xStep;
       const y = padding.top + chartHeight - ((Number(point.total) || 0) / (axisMax || 1) * chartHeight);
-      context.fillStyle = "#8e83e8";
+      context.fillStyle = "#fff";
       context.beginPath();
       context.arc(x, y, 3.5, 0, Math.PI * 2);
       context.fill();
@@ -65,7 +65,7 @@
         context.save();
         context.translate(x, padding.top + chartHeight + 9);
         context.rotate(-Math.PI / 4);
-        context.fillStyle = "#667085";
+        context.fillStyle = "#fff";
         context.fillText(formatDate(point.date), 0, 0);
         context.restore();
       }

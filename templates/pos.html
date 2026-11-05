@@ -26,7 +26,7 @@
                 <input type="hidden" name="event_id" value="{{ selected_event_id or '' }}">
                 <input type="hidden" name="location" value="store">
               <div class="pos-cart-table">
-                <table>
+                <table data-no-pagination>
                   <thead>
                     <tr>
                       <th>Item</th>
@@ -125,7 +125,7 @@
         <p id="multiple-payment-error" role="alert"></p>
         <menu>
           <button value="cancel">Cancel</button>
-          <button id="complete-multiple-payment" value="default">Checkout</button>
+          <button id="complete-multiple-payment" value="default">Finalize</button>
         </menu>
       </form>
     </dialog>

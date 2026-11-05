@@ -20,7 +20,7 @@
       <strong>Bill to</strong>
       <p>{{ customer.name if customer else "Customer" }}{% if customer and customer.email %}<br>{{ customer.email }}{% endif %}{% if customer and customer.phone %}<br>{{ customer.phone }}{% endif %}{% if customer and customer.address %}<br>{{ customer.address }}{% endif %}</p>
     </section>
-    <table class="document-lines">
+    <table class="document-lines" data-no-pagination data-no-table-scroll>
       <thead><tr><th>#</th><th>Description</th><th class="amount">Qty</th><th class="amount">Rate</th><th class="amount">Discount</th><th class="amount">Amount</th></tr></thead>
       <tbody>
         {% for line in lines %}
