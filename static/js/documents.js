@@ -3,6 +3,12 @@ const lineBody = document.querySelector("#document-lines");
 const lineTemplate = document.querySelector("#document-line-template");
 const money = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const documentPageTitle = document.querySelector("#document-page-title");
+if (documentPageTitle && documentForm) {
+  const documentType = documentForm.dataset.documentType;
+  documentPageTitle.textContent = `${documentType.charAt(0).toUpperCase()}${documentType.slice(1)}s`;
+}
+
 function addDocumentLine() {
     lineBody.append(lineTemplate.content.cloneNode(true));
     updateTotals();

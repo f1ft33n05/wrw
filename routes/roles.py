@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -34,6 +33,7 @@ MODULES = [
     ("purchases", "Purchases"),
     ("reports", "Reports"),
     ("inventory", "Inventory"),
+    ("settings", "System settings"),
 ]
 
 
@@ -89,7 +89,7 @@ async def roles_page(request: Request, user: user_dependency, db: db_dependency)
         "roles": roles,
         "permissions_by_role": permissions_by_role,
         "modules": MODULES,
-        "permissions_by_role_json": json.dumps(permissions_json),
+        "permissions_by_role_json": permissions_json,
         "role_user_counts": role_user_counts,
     })
 

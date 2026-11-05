@@ -1,11 +1,10 @@
 {% include "header.html" %}
 <body>
-<div class="container row">
+  {% include "navbar.html" %}
+<div class="content-container row">
   {% include "sidebar.html" %}
-  <div class="col-xs-12 col-md-9">
-  {% include "sales_navigation.html" ignore missing %}
-  <main class="container">
-    <header><h1>Payments</h1><a role="button" href="/sales/receipts">Receipts</a></header>
+  <main  class="payments-page col-xs-12 col-md-9">
+    <h1>Payments</h1>
     <table class="striped">
       <thead><tr><th>Payment ID</th><th>Invoice</th><th>Customer</th><th>Amount</th><th>Method</th><th>Collected by</th><th>Date</th><th>Receipt</th></tr></thead>
       <tbody>

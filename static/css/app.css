@@ -12,6 +12,9 @@ header {
     align-items: center;
     justify-content: center;
 }
+h1 {
+    font-size: 2.4rem;
+}
 
 header nav {
     width: 80%;
@@ -24,6 +27,10 @@ header nav li {
 
 details.dropdown>summary+ul {
     width: 15rem;
+}
+
+tbody {
+    font-size: 1.5rem;
 }
 
 #user-avatar {
@@ -237,11 +244,6 @@ details.dropdown>summary+ul {
     .pos-actions { grid-column: 1; flex-wrap: wrap; }
 }
 
-#reseller_pg_content {
-    width: 80%;
-    margin: 3rem auto;
-}
-
 .authentication-content {
     display: flex;
     justify-content: center;
@@ -395,7 +397,7 @@ details.dropdown>summary+ul {
     text-align: left;
 }
 
-.items-page summary, .all-sales-container summary, .event-create-form-container summary {
+.items-page summary, .all-sales-container summary, .event-create-form-container summary, .reseller-pay-add, .purchase-form-container summary {
     width: fit-content;
     background-color: var(--pico-primary);
     color: #fff;
@@ -404,7 +406,7 @@ details.dropdown>summary+ul {
     font-size: 1.6rem;
 }
 
-.items-page summary::after, .all-sales-container summary::after, .event-create-form-container summary::after {
+.items-page summary::after, .all-sales-container summary::after, .event-create-form-container summary::after, .purchase-form-container summary::after {
     display : none;
 }
 
@@ -595,6 +597,145 @@ details.dropdown>summary+ul {
     font-size: 1.5rem;
 }
 
+/* RESELLERS */
+
+#reseller_pg_content {
+    width: 100%;
+    max-height: calc(100vh -10rem);
+}
+
+#reseller_pg_content tbody {
+    font-size: 1.5rem;}
+
+.reseller-select-form {
+    margin: 3rem 0;
+    width: 50%;
+}
+.reseller-select-form select {
+    font-size: 1.6rem;
+    margin-top: 2rem;
+}
+
+.reseller-stats {
+    margin-bottom: 3rem;
+}
+
+.reseller-stats article {
+    border: solid 0.1rem #2a3140;
+}
+
+.allocation-cart summary, .reconciliation-form summary, .reseller-stock-mvmt summary, .rec-pay-main-summ {
+    width: 50%;
+    background-color: rgb(28 33 44);
+    color: #fff;
+    padding: 1.5rem 1rem;
+    border: solid 0.1rem #2a3140;
+    border-radius: 0.3rem;
+    font-size: 1.6rem;
+    font-weight: bold;
+}
+
+.allocation-cart form, #reconciliation-form {
+    margin: 2rem 0;
+}
+
+.allocation-cart input, .allocation-cart select {
+    font-size: 1.6rem;
+    height: 4rem;
+}
+
+.allocation-cart button, .reconciliation-form button,#reseller-payment-form button, #add-purchase-line {
+    font-size: 1.6rem;
+    margin-top: 1rem;
+}
+
+ .allocation-save-btn {
+    width: 50% !important;
+}
+
+#reconciliation-form label, #reseller-payment-form label {
+    margin-bottom: 1rem;
+    font-size: 1.6rem;
+}
+
+#reconciliation-form input, #reseller-payment-form input, #reseller-payment-form select {
+    height: 4rem;
+    font-size: 1.6rem;
+    margin-top: 1rem;
+    width: 50%;
+}
+
+#reseller-payment-form input, #reseller-payment-form select  {
+    width: 100%;
+}
+
+#reconciliation-form button, #reseller-payment-form button {
+    width: 50%;
+}
+
+#reconciliation-form tbody {
+    font-size: 1.5rem;
+}
+
+#reseller-payment-form {
+    width: 50%;
+    margin-top: 2rem;
+}
+
+/* RECEIPTS */
+.receipts-page h1, .payments-page h1 {
+    font-size: 2.4rem;
+}
+
+.receipts-page table, .payments-page table {
+    margin-top: 2rem;
+}
+
+
+/* PURCHASES */
+.purchase-form-container {
+    padding: 2rem;
+    margin-top: 2rem;
+}
+
+#purchase-form {
+    margin-top: 2rem;
+}
+#purchase-form label{
+    font-size: 1.6rem;
+    margin-bottom: 1rem;
+}
+#purchase-form select{
+    font-size: 1.6rem;
+    margin-bottom: 1rem;
+}
+#purchase-form input{
+    font-size: 1.6rem;
+    height: 4rem;
+}
+
+#purchase-form .supplier-select {
+    width: 50%;
+}
+
+.purchase-payments {
+    margin-top: 2rem;
+}
+
+.receive-purchase {
+    width: 50% !important;
+    font-size: 1.6rem;
+}
+
+.supplier-balances, .purchase-history {
+    margin-top: 3rem;
+}
+.supplier-balances h2, .purchase-history h2 {
+    margin-bottom: 2rem;
+    
+}
+
+
 /* SIDEBAR */
 
 aside {
@@ -602,6 +743,6 @@ aside {
 }
 
 aside details ul {
-    padding-left: 3rem;
+    padding-left: 2rem;
     font-size: 1.6rem;
 }

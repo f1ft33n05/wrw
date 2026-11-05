@@ -1,10 +1,11 @@
 {% include "header.html" %}
 <body>
-  <div class="container row">
+  {% include "navbar.html" %}
+  <div class="content-container row">
     {% include "sidebar.html" %}
-    <main class="col-xs-12 col-md-9">
-    <nav><ul><li><strong>{{ document_type|title }}s</strong></li></ul><ul><li><a href="/dashboard">Dashboard</a></li><li>{{ user.username }}</li></ul></nav>
-    <details open>
+    <main class="contcts col-xs-12 col-md-9">
+    <h1 id="document-page-title"></h1>
+    <details>
       <summary>Create {{ document_type }}</summary>
       <form id="document-form" data-document-type="{{ document_type }}">
         <div class="grid">
@@ -41,7 +42,7 @@
         <td><button type="button" class="secondary" data-remove-document-line>Remove</button></td>
       </tr>
     </template>
-    <h2>{{ document_type|title }} history</h2>
+    <h2>All {{ document_type|title }}s</h2>
     <table class="striped">
       <thead><tr><th>Number</th><th>Customer</th><th>Date</th><th>Status</th><th>Total</th><th>Actions</th></tr></thead>
       <tbody>

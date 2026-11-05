@@ -11,6 +11,7 @@ from database import db_dependency
 from database_models import Contact, Invoices, Item, Quotations
 from models import DocumentRequest, Role
 from routes.auth import RoleChecker, get_current_user
+from routes.settings import get_settings
 from routes.ledger_utils import decimal_value, format_money, money
 from config import CURRENCY_CODE
 
@@ -96,7 +97,7 @@ async def create_quotation(payload: DocumentRequest, user: user_dependency, db: 
     timestamp = datetime.now(timezone.utc).isoformat()
     quotation = Quotations(
         customer_id=payload.customer_id,
-        document_number=payload.document_number or _document_number(db, "QT", Quotations),
+        document_number=payload.document_number or _document_number(db, get_settings(db)["quotation_prefix"], Quotations),
         issue_date=payload.issue_date,
         expiry_date=payload.expiry_date,
         notes=payload.notes,
@@ -139,7 +140,7 @@ async def create_invoice(payload: DocumentRequest, user: user_dependency, db: db
     timestamp = datetime.now(timezone.utc).isoformat()
     invoice = Invoices(
         customer_id=payload.customer_id,
-        document_number=payload.document_number or _document_number(db, "INV", Invoices),
+        document_number=payload.document_number or _document_number(db, get_settings(db)["invoice_prefix"], Invoices),
         issue_date=payload.issue_date,
         due_date=payload.due_date,
         notes=payload.notes,
@@ -169,7 +170,7 @@ async def convert_quotation(quotation_id: int, user: user_dependency, db: db_dep
     timestamp = datetime.now(timezone.utc).isoformat()
     invoice = Invoices(
         customer_id=quotation.customer_id,
-        document_number=_document_number(db, "INV", Invoices),
+        document_number=_document_number(db, get_settings(db)["invoice_prefix"], Invoices),
         issue_date=datetime.now(timezone.utc).date().isoformat(),
         due_date=quotation.expiry_date,
         notes=quotation.notes,

@@ -1,18 +1,10 @@
 {% include "header.html" %}
 <body>
-  <header>
-    <nav>
-      <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/working--.png') }}" alt="We are Wines Logo"></a></div>
-      <ul><li>{{ user.username }}</li></ul>
-    </nav>
-  </header>
-  <div class="container row">
+  {% include "navbar.html" %}
+  <div class="content-container row">
     {% include "sidebar.html" %}
-    <main class="col-xs-12 col-md-10 reports-page">
-      <article>
-        <header class="row">
-          <section class="title"><h1>Reports</h1>&nbsp;&bull;&nbsp;<span>{{ report_title }}</span></section>
-        </header>
+    <main class="contcts col-xs-12 col-md-9">
+    <h1>Reports</h1>
 
         <div class="report-tabs">
           {% for value, label in report_types.items() %}

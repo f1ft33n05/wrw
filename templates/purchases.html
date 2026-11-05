@@ -1,101 +1,97 @@
 {% include "header.html" %}
 <body>
-  <div class="container row">
+  {% include "navbar.html" %}
+  <div class="content-container row">
     {% include "sidebar.html" %}
-    <div class="col-xs-12 col-md-9">
-  <header>
-    <nav>
-      <ul><li><strong>Supplier purchases</strong></li></ul>
-      <ul>
-        <li><a href="/suppliers">Suppliers</a></li>
-        <li><a href="/dashboard">Dashboard</a></li>
-        <li>{{ user.username }}</li>
-      </ul>
-    </nav>
-  </header>
-  <main class="container">
+    <main class="col-xs-12 col-md-9">
     <h1>Purchases</h1>
-    <details open>
-      <summary>Receive supplier purchase</summary>
-      <form id="purchase-form">
-        <label>
-          Supplier
-          <select name="supplier_id" required>
-            <option value="">Select supplier</option>
-            {% for supplier in suppliers %}
-            <option value="{{ supplier.id }}">{{ supplier.name }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <table>
-          <thead><tr><th>Item</th><th>Quantity</th><th>Unit cost (MWK)</th><th></th></tr></thead>
-          <tbody id="purchase-lines"></tbody>
-        </table>
-        <button type="button" class="secondary" id="add-purchase-line">Add item</button>
-        <div class="grid">
-          <label>Amount paid (MWK)<input type="number" name="amount_paid" min="0" step="0.01" value="0" required></label>
-          <label>Payment method
-            <select name="payment_method">
-              <option value="">No payment yet</option>
-              <option value="cash">Cash</option>
-              <option value="card">Card</option>
-              <option value="mobile money">Mobile money</option>
-              <option value="bank transfer">Bank transfer</option>
+    <article class="purchase-form-container">
+      <details>
+        <summary>Add Purchase +</summary>
+        <form id="purchase-form">
+          <label>
+            Supplier <br>
+            <select class="supplier-select" name="supplier_id" required>
+              <option value="">Select supplier</option>
+              {% for supplier in suppliers %}
+              <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+              {% endfor %}
             </select>
           </label>
-        </div>
-        <p id="purchase-error" role="alert"></p>
-        <button type="submit">Receive purchase</button>
-      </form>
-    </details>
-
-    <h2>Outstanding supplier balances</h2>
-    <table class="striped">
-      <thead><tr><th>Supplier</th><th>Balance Due</th></tr></thead>
-      <tbody>
-        {% for row in supplier_balances %}
-        <tr><td>{{ row.supplier.name }}</td><td>{{ row.balance|money }}</td></tr>
-        {% else %}
-        <tr><td colspan="2">No outstanding supplier balances.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-
-    <h2>Purchase history</h2>
-    <table class="striped">
-      <thead><tr><th>Purchase</th><th>Supplier</th><th>Date</th><th>Items</th><th>Total</th><th>Paid</th><th>Balance Due</th><th>Payment</th></tr></thead>
-      <tbody>
-        {% for row in purchases %}
-        <tr>
-          <td>#{{ row.purchase.id }}</td>
-          <td>{{ row.supplier_name }}</td>
-          <td>{{ row.created_at }}</td>
-          <td>{% for line in row.line_summaries %}{{ line }}{% if not loop.last %}<br>{% endif %}{% else %}No lines{% endfor %}</td>
-          <td>{{ row.total|money }}</td>
-          <td>{{ row.paid|money }}</td>
-          <td>{{ row.balance|money }}</td>
-          <td>
-            {% for payment in row.payment_history %}
-            <small>{{ payment.created_at }} · {{ payment.amount|money }} ({{ payment.payment_method }})</small><br>
-            {% endfor %}
-            {% if row.balance > 0 %}
-            <form data-supplier-payment data-purchase-id="{{ row.purchase.id }}">
-              <input aria-label="Payment amount (MWK)" type="number" name="amount" min="0.01" max="{{ row.balance }}" step="0.01" required>
-              <select name="payment_method" aria-label="Payment method" required>
-                <option value="cash">Cash</option><option value="card">Card</option>
-                <option value="mobile money">Mobile money</option><option value="bank transfer">Bank transfer</option>
+          <table>
+            <thead><tr><th>Item</th><th>Quantity</th><th>Unit cost (MWK)</th><th></th></tr></thead>
+            <tbody id="purchase-lines"></tbody>
+          </table>
+          <button type="button" class="secondary" id="add-purchase-line">Add Item</button>
+          <div class="grid purchase-payments">
+            <label>Amount Paid (MWK)<input type="number" name="amount_paid" min="0" step="0.01" value="0" required></label>
+            <label>Payment Method
+              <select name="payment_method">
+                <option value="">No payment yet</option>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="mobile money">Mobile money</option>
+                <option value="bank transfer">Bank transfer</option>
               </select>
-              <button type="submit">Pay</button>
-            </form>
-            {% else %}Paid{% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="8">No purchases recorded.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <p id="supplier-payment-message" role="status"></p>
+            </label>
+          </div>
+          <p id="purchase-error" role="alert"></p>
+          <button class="receive-purchase" type="submit">Receive Purchase</button>
+        </form>
+        <p id="supplier-payment-message" role="status"></p>
+      </details>
+    </article>
+
+    <div class="supplier-balances">
+      <h2>Supplier Balances</h2>
+      <table class="striped">
+        <thead><tr><th>Supplier</th><th>Balance Due</th></tr></thead>
+        <tbody>
+          {% for row in supplier_balances %}
+          <tr><td>{{ row.supplier.name }}</td><td>{{ row.balance|money }}</td></tr>
+          {% else %}
+          <tr><td colspan="2">No outstanding supplier balances.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="purchase-history">
+        <h2>Purchase history</h2>
+        <table class="striped">
+          <thead><tr><th>Purchase</th><th>Supplier</th><th>Date</th><th>Items</th><th>Total</th><th>Paid</th><th>Balance Due</th><th>Payment</th></tr></thead>
+          <tbody>
+            {% for row in purchases %}
+            <tr>
+              <td>#{{ row.purchase.id }}</td>
+              <td>{{ row.supplier_name }}</td>
+              <td>{{ row.created_at }}</td>
+              <td>{% for line in row.line_summaries %}{{ line }}{% if not loop.last %}<br>{% endif %}{% else %}No lines{% endfor %}</td>
+              <td>{{ row.total|money }}</td>
+              <td>{{ row.paid|money }}</td>
+              <td>{{ row.balance|money }}</td>
+              <td>
+                {% for payment in row.payment_history %}
+                <small>{{ payment.created_at }} · {{ payment.amount|money }} ({{ payment.payment_method }})</small><br>
+                {% endfor %}
+                {% if row.balance > 0 %}
+                <form data-supplier-payment data-purchase-id="{{ row.purchase.id }}">
+                  <input aria-label="Payment amount (MWK)" type="number" name="amount" min="0.01" max="{{ row.balance }}" step="0.01" required>
+                  <select name="payment_method" aria-label="Payment method" required>
+                    <option value="cash">Cash</option><option value="card">Card</option>
+                    <option value="mobile money">Mobile money</option><option value="bank transfer">Bank transfer</option>
+                  </select>
+                  <button type="submit">Pay</button>
+                </form>
+                {% else %}Paid{% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8">No purchases recorded.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+    </div>
   </main>
   <template id="purchase-line-template">
     <tr>

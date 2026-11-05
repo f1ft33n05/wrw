@@ -18,6 +18,13 @@ class User(Base):
     updated_at = Column(String)
 
 
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    key = Column(String, primary_key=True, index=True)
+    value = Column(String, nullable=False, default="")
+
+
 class RoleDefinition(Base):
     __tablename__ = "role_definitions"
 

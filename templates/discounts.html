@@ -1,24 +1,6 @@
 {% include "header.html" %}
 <body>
-    <header>
-      <nav>
-          <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-light.png') }}" alt="We are Wines Logo"></a></div>
-          <ul>
-              <li>
-              <details class="dropdown">
-                  <summary id="user-avatar">
-                    <img src="{{ url_for('static', path='images/user-avatar.png') }}" alt="We are Wines Logo">
-                  </summary>
-                  <ul dir="rtl">
-                  <li><a href="#">Profile</a></li>
-                  <li><a href="#">Settings</a></li>
-                  <li><a href="#">Logout</a></li>
-                  </ul>
-              </details>
-              </li>
-          </ul>
-      </nav>
-  </header>
+  {% include "navbar.html" %}
   <div class="content-container row">
       {% include "sidebar.html" %}
       <div class="col-xs-12 col-md-9">

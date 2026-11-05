@@ -1,11 +1,12 @@
 {% include "header.html" %}
 <body>
-  <header><nav><div class="logo"><a href="/"><img src="{{ url_for('static', path='images/working---edited.png') }}" alt="Logo"></a></div><ul><li>{{ user.username }}</li></ul></nav></header>
-  <div class="container row">
+  {% include "navbar.html" %}
+  <div class="content-container row">
     {% include "sidebar.html" %}
-    <main class="col-xs-12 col-md-10">
+    <main class="col-xs-12 col-md-9">
+      <h1>Roles</h1>
       <article>
-        <header class="row"><section class="title"><h1>Roles</h1>&nbsp;&bull;&nbsp;<span>Module permissions</span></section><button type="button" id="add-role">Add role</button></header>
+        <header><button type="button" id="add-role">Add role</button></header>
         <table>
           <thead><tr><th>Role</th><th>Description</th><th>Modules</th><th>Users</th><th>Action</th></tr></thead>
           <tbody>
@@ -43,8 +44,9 @@
   <script>
     const dialog = document.getElementById('role-dialog');
     const form = document.getElementById('role-form');
-    const permissions = {{ permissions_by_role_json | safe }};
-    document.getElementById('add-role').addEventListener('click', () => {
+    const permissions = {{ permissions_by_role_json | tojson }};
+    const addRoleButton = document.getElementById('add-role');
+    addRoleButton?.addEventListener('click', () => {
       form.reset(); form.elements.role_id.value = '';
       document.getElementById('role-dialog-title').textContent = 'Add role';
       dialog.showModal();

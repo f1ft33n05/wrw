@@ -191,7 +191,7 @@ def init_db():
     db.commit()
     if db.query(database_models.RoleDefinition).count() == 0:
         module_permissions = {
-            "admin": ["dashboard", "users", "contacts", "items", "sales", "events", "quotations", "invoices", "purchases", "reports", "inventory"],
+            "admin": ["dashboard", "users", "contacts", "items", "sales", "events", "quotations", "invoices", "purchases", "reports", "inventory", "settings"],
             "manager": ["dashboard", "users", "contacts", "items", "sales", "events", "quotations", "invoices", "purchases", "reports", "inventory"],
             "cashier": ["dashboard", "contacts", "items", "sales", "events", "quotations", "invoices", "inventory"],
         }

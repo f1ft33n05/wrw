@@ -1,0 +1,23 @@
+  <header>
+    <nav>
+      <div class="logo"><a href="/"><img src="{{ url_for('static', path='images/wrw-light.png') }}" alt="We are Wines Logo"></a></div>
+      <ul>
+        <li>
+          <details class="dropdown">
+            <summary id="user-avatar">
+              <img src="{{ url_for('static', path='images/user-avatar.png') }}" alt="User avatar">
+            </summary>
+            <ul dir="rtl">
+              <li><a href="/profile">Profile</a></li>
+              <li><a href="/settings">Settings</a></li>
+              <li>
+                <form action="/auth/logout" method="post">
+                  <button type="submit" class="logout-link">Log out</button>
+                </form>
+              </li>
+            </ul>
+          </details>
+        </li>
+      </ul>
+    </nav>
+  </header>

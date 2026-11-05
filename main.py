@@ -24,6 +24,8 @@ import routes.events as events
 import routes.documents as documents
 import routes.reports as reports
 import routes.roles as roles
+import routes.account as account
+import routes.settings as settings
 from routes.auth import get_current_user
 from models import Role
 from routes.auth import RoleChecker
@@ -43,6 +45,8 @@ app.include_router(events.router)
 app.include_router(documents.router)
 app.include_router(reports.router)
 app.include_router(roles.router)
+app.include_router(account.router)
+app.include_router(settings.router)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

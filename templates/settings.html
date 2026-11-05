@@ -1,0 +1,33 @@
+{% include "header.html" %}
+<body>
+  {% include "navbar.html" %}
+  <div class="content-container row">
+    {% include "sidebar.html" %}
+    <main class="col-xs-12 col-md-9">
+      <h1>System settings</h1>
+      {% if request.query_params.get("updated") == "1" %}
+        <p>Settings saved successfully.</p>
+      {% endif %}
+      <article>
+        <form method="post" action="/settings">
+          <h2>Document numbering</h2>
+          <div class="grid">
+            <label>Receipt prefix<input name="receipt_prefix" value="{{ settings.receipt_prefix }}" maxlength="20" required></label>
+            <label>Quotation prefix<input name="quotation_prefix" value="{{ settings.quotation_prefix }}" maxlength="20" required></label>
+            <label>Invoice prefix<input name="invoice_prefix" value="{{ settings.invoice_prefix }}" maxlength="20" required></label>
+          </div>
+          <h2>Document layout</h2>
+          <label>Layout
+            <select name="document_layout">
+              <option value="standard" {% if settings.document_layout == "standard" %}selected{% endif %}>Standard</option>
+              <option value="compact" {% if settings.document_layout == "compact" %}selected{% endif %}>Compact</option>
+            </select>
+          </label>
+          <label>Document footer<textarea name="document_footer" rows="4">{{ settings.document_footer }}</textarea></label>
+          <button type="submit">Save settings</button>
+        </form>
+      </article>
+    </main>
+  </div>
+</body>
+</html>
