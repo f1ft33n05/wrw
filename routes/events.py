@@ -11,7 +11,7 @@ from database_models import EventStockAllocation, Events, Invoices, Item, Paymen
 from models import EventRequest, EventStockAllocationRequest, Role
 from routes.auth import RoleChecker, get_current_user
 from routes.ledger_utils import decimal_value, format_money
-from event_stock import return_expired_event_stock
+from event_stock import parse_event_timestamp, return_expired_event_stock
 
 
 router = APIRouter(tags=["events"])
@@ -64,6 +64,14 @@ async def allocate_event_stock(
     event = db.query(Events).filter(Events.id == event_id).first()
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
+    if event.status in {"closed", "cancelled"}:
+        raise HTTPException(status_code=409, detail="Stock cannot be assigned to a closed event")
+    ends_at = parse_event_timestamp(event.ends_at or event.starts_at)
+    if ends_at is not None and ends_at < datetime.now(timezone.utc):
+        event.status = "closed"
+        event.updated_at = datetime.now(timezone.utc).isoformat()
+        db.commit()
+        raise HTTPException(status_code=409, detail="Stock cannot be assigned to a closed event")
 
     item_ids = [line.item_id for line in payload.allocations]
     if len(set(item_ids)) != len(item_ids):
@@ -114,6 +122,7 @@ async def allocate_event_stock(
 
 @router.get("/events/{event_id}", response_class=HTMLResponse, dependencies=[EVENT_VIEW_ACCESS])
 async def event_detail(event_id: int, request: Request, user: user_dependency, db: db_dependency):
+    return_expired_event_stock(db)
     event = db.query(Events).filter(Events.id == event_id).first()
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")

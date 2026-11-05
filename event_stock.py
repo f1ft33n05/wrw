@@ -18,14 +18,30 @@ def parse_event_timestamp(value: str | None):
     return parsed.astimezone(timezone.utc)
 
 
+def event_is_expired(event: Events, now: datetime | None = None) -> bool:
+    current_time = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    ends_at = parse_event_timestamp(event.ends_at or event.starts_at)
+    return ends_at is not None and ends_at < current_time
+
+
 def return_expired_event_stock(db, now: datetime | None = None) -> list[dict]:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    timestamp = now.isoformat()
+
+    events = db.query(Events).filter(Events.status.in_(["planned", "active"])).all()
+    closed_changed = False
+    for event in events:
+        ends_at = parse_event_timestamp(event.ends_at or event.starts_at)
+        if ends_at is not None and ends_at < now:
+            event.status = "closed"
+            event.updated_at = timestamp
+            closed_changed = True
+
     allocations = db.query(EventStockAllocation).filter(
         EventStockAllocation.status == "active",
         EventStockAllocation.quantity_remaining != "0",
     ).with_for_update().all()
     returned = []
-    timestamp = now.isoformat()
 
     for allocation in allocations:
         event = db.query(Events).filter(Events.id == allocation.event_id).with_for_update().first()
@@ -56,6 +72,7 @@ def return_expired_event_stock(db, now: datetime | None = None) -> list[dict]:
         ))
         returned.append({"event_id": event.id, "item_id": item.id, "quantity": str(remaining)})
 
-    if returned:
+    if returned or closed_changed:
         db.commit()
+        db.expire_all()
     return returned

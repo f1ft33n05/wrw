@@ -27,7 +27,15 @@ function isEventToday(startValue) {
         && start.getDate() === today.getDate();
 }
 
-function updateCountdown(startValue) {
+function isEventEnded(endValue, startValue) {
+    const value = endValue || startValue;
+    const end = value && value.length === 10
+        ? parseLocalDate(`${value}T23:59:59`)
+        : parseLocalDate(value);
+    return Boolean(end && end.getTime() < Date.now());
+}
+
+function updateCountdown(startValue, endValue) {
     const target = parseLocalDate(startValue);
     const countdown = document.querySelector("#event-countdown-value");
     const label = document.querySelector("#event-countdown-label");
@@ -40,12 +48,17 @@ function updateCountdown(startValue) {
     }
 
     const remaining = target.getTime() - Date.now();
+    const expired = isEventEnded(endValue, startValue);
     if (remaining > 0) {
         const days = Math.floor(remaining / 86400000);
         const hours = Math.floor((remaining % 86400000) / 3600000);
         const minutes = Math.floor((remaining % 3600000) / 60000);
         countdown.textContent = `${days}d ${hours}h ${minutes}m`;
         label.textContent = "Until event";
+        openPos.disabled = true;
+    } else if (expired) {
+        countdown.textContent = "Event passed";
+        label.textContent = "";
         openPos.disabled = true;
     } else if (isEventToday(startValue)) {
         countdown.textContent = "Event day";
@@ -61,6 +74,12 @@ function updateCountdown(startValue) {
 window.openEventDetails = function (card) {
         window.eventCardBeingOpened = card;
         const start = parseLocalDate(card.dataset.start);
+        const expired = ["closed", "cancelled"].includes(card.dataset.status)
+            || isEventEnded(card.dataset.end, card.dataset.start);
+        if (expired && !["closed", "cancelled"].includes(card.dataset.status)) {
+            card.dataset.status = "closed";
+            card.querySelector("em").textContent = "Closed";
+        }
         document.querySelector("#event-detail-name").textContent = card.dataset.name;
         document.querySelector("#event-detail-venue").textContent = card.dataset.venue || "Location not set";
         document.querySelector("#event-detail-date").textContent = formatEventDate(card.dataset.start);
@@ -69,6 +88,10 @@ window.openEventDetails = function (card) {
         document.querySelector("#event-detail-description").textContent =
             card.dataset.description || "No additional details.";
         document.querySelector("#event-view-sales").href = `/events/${card.dataset.id}`;
+        const assignStock = document.querySelector("#assign-event-stock");
+        const isClosed = ["closed", "cancelled"].includes(card.dataset.status);
+        assignStock.disabled = isClosed || expired;
+        document.querySelector("#event-open-pos").disabled = isClosed || expired;
         document.querySelector("#event-open-pos").onclick = () => {
             window.location.assign(`/sales/pos?event_id=${card.dataset.id}`);
         };
@@ -78,12 +101,20 @@ window.openEventDetails = function (card) {
             if (dateLabel) dateLabel.textContent = formatEventDate(card.dataset.start);
         });
         clearInterval(countdownTimer);
-        updateCountdown(card.dataset.start);
-        countdownTimer = setInterval(() => updateCountdown(card.dataset.start), 60000);
+        updateCountdown(card.dataset.start, card.dataset.end);
+        countdownTimer = setInterval(() => updateCountdown(card.dataset.start, card.dataset.end), 60000);
         if (eventDialog?.open) return;
         if (eventDialog?.showModal) eventDialog.showModal();
         else if (eventDialog) eventDialog.setAttribute("open", "");
 };
+
+document.querySelectorAll(".event-card").forEach((card) => {
+    if (!["closed", "cancelled"].includes(card.dataset.status) && isEventEnded(card.dataset.end, card.dataset.start)) {
+        card.dataset.status = "closed";
+        const status = card.querySelector("em");
+        if (status) status.textContent = "Closed";
+    }
+});
 
 document.querySelector("#close-event-dialog")?.addEventListener("click", () => eventDialog?.close());
 

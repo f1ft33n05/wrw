@@ -82,6 +82,13 @@ def _active_discount(db, item: Item) -> Decimal:
 templates.env.filters["money"] = _format_money
 
 
+def _format_plain_money(value: object) -> str:
+    return f"{_money(_decimal(value, 'money amount')):,.2f}"
+
+
+templates.env.filters["plain_money"] = _format_plain_money
+
+
 def _timestamp(value: datetime | str | None) -> str | None:
     if value is None:
         return None
@@ -596,7 +603,7 @@ async def create_sale(
                     "retail_quantity": str(retail_quantity),
                     "retail_unit_price": str(retail_unit_price),
                     "unit_prices": (
-                        f"{CURRENCY_CODE} {_compact_decimal(wholesale_unit_price, 'wholesale price')}:"
+                        f"{_compact_decimal(wholesale_unit_price, 'wholesale price')}:"
                         f"{_compact_decimal(retail_unit_price, 'retail price')}"
                     ),
                 }
@@ -882,7 +889,7 @@ async def receipt(
                 "unit_prices": snapshot.get(
                     "unit_prices",
                     _compact_decimal(sale.unit_price or "0.00", "unit price"),
-                ),
+                ).replace(f"{CURRENCY_CODE} ", ""),
                 "total": sale.total_price,
                 "price_breakdown": (
                     "; ".join(price_segments)
