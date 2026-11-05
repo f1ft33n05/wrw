@@ -545,7 +545,7 @@ async def create_sale(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"{item.name} has an invalid wholesale threshold",
                 )
-            wholesale_quantity = threshold if quantity >= threshold else Decimal("0")
+            wholesale_quantity = (quantity // threshold) * threshold
             retail_quantity = quantity - wholesale_quantity
             wholesale_unit_price = _money(
                 _decimal(

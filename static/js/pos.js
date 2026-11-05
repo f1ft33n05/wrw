@@ -113,7 +113,10 @@ function formatMoney(value) {
 
 function priceForQuantity(option, quantity) {
     const threshold = Number(option.dataset.wholesaleThreshold);
-    const wholesaleQuantity = quantity >= threshold ? threshold : 0;
+    const thresholdIsValid = Number.isFinite(threshold) && threshold > 0;
+    const wholesaleQuantity = thresholdIsValid
+        ? Math.round(Math.floor((quantity / threshold) + Number.EPSILON) * threshold * 100) / 100
+        : 0;
     const retailQuantity = quantity - wholesaleQuantity;
     const retailPrice = Number(option.dataset.retail);
     const wholesalePrice = Number(option.dataset.wholesale);
@@ -161,14 +164,14 @@ function updateSelectedPrice() {
 function renderCart() {
     cartBody.replaceChildren();
     let total = 0;
-    if (cart.size === 0) {
-        const row = document.createElement("tr");
-        const cell = document.createElement("td");
-        cell.colSpan = 6;
-        cell.textContent = "No items added.";
-        row.append(cell);
-        cartBody.append(row);
-    }
+    // if (cart.size === 0) {
+    //     const row = document.createElement("tr");
+    //     const cell = document.createElement("td");
+    //     cell.colSpan = 6;
+    //     cell.textContent = "No items added.";
+    //     row.append(cell);
+    //     cartBody.append(row);
+    // }
 
     for (const [itemId, line] of cart) {
         const row = document.createElement("tr");

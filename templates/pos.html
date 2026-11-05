@@ -18,15 +18,11 @@
                     </select>
                     <input id="pos-search" type="search" list="pos-product-options"  autocomplete="off"
                       placeholder="Search product by name or SKU...">
-                    <datalist id="pos-product-options">
-                      {% for item in items %}
-                      <option value="{{ item.id }}">{{ item.name }} ({{ item.barcode or 'No SKU' }})</option>
-                      {% endfor %}
-                    </datalist>
+                    
                 </div>
                 <input type="hidden" name="event_id" value="{{ selected_event_id or '' }}">
                 <input type="hidden" name="location" value="store">
-              <div class="pos-cart-table">
+              <div class="pos-cart-table hide-scrollbar">
                 <table data-no-pagination>
                   <thead>
                     <tr>
@@ -58,7 +54,7 @@
             <div class="products-selection">
               <aside class="pos-products-panel">
               <div class="pos-products-heading">Products</div>
-              <div class="pos-product-grid" id="pos-products">
+              <div class="pos-product-grid hide-scrollbar" id="pos-products">
                 {% for item in items %}
                 <button class="pos-product-card" type="button"
                   data-id="{{ item.id }}"
