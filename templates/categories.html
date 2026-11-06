@@ -6,6 +6,7 @@
     <div class="col-xs-12 col-md-9">
     <main class="items-page">
         <h1>Categories</h1>
+        {% if user.role in ["admin", "manager"] %}
         <article class="item-create-form-container">
             <details>
                 <summary>Add +</summary>
@@ -18,12 +19,7 @@
                 </form>
             </details>
         </article>
-        <!-- <form id="category-form">
-          <label>Name <input name="name" required></label>
-          <label>Description <input name="description"></label>
-          <p id="category-error" role="alert"></p>
-          <button>Add category</button>
-        </form> -->
+        {% endif %}
         <table class="striped">
           <thead>
             <tr>

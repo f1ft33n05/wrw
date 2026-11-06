@@ -21,11 +21,10 @@
             <input type="date" name="date_to" value="{{ date_to }}">
           </label>
           <button type="submit">Apply filters</button>
-          <a role="button" class="secondary" href="/reports?type={{ report_type }}">Clear</a>
         </form>
 
         <div class="report-actions">
-          <strong>{{ row_count }} record{% if row_count != 1 %}s{% endif %}</strong>
+          <strong></strong>
           <span>
             <a role="button" class="secondary" href="/reports/export/xlsx?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Excel</a>
             <a role="button" class="secondary" href="/reports/export/pdf?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">PDF</a>
@@ -35,6 +34,30 @@
         </div>
 
         <div class="report-table">
+          <div  class="A4-document-letterhead">
+            <div class="letterhead-logo">
+              <img src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="We are Wines Logo">
+            </div>
+            <div class="letterhead-contact-info" >
+              <h3>Area 47, Sector 4. Lilongwe. Malawi.</h3>
+              <p>info@wearewines.com</p>
+              <p>+265 (0) 999 123 456</p>
+              <p>+265 (0) 999 123 456</p>
+            </div>
+          </div>
+          <h2>{{ report_title|title }}</h2>
+          <p class="report-date-range">
+            <strong>Date range:</strong>
+            {% if date_from and date_to %}
+              {{ date_from }} to {{ date_to }}
+            {% elif date_from %}
+              From {{ date_from }}
+            {% elif date_to %}
+              Up to {{ date_to }}
+            {% else %}
+              All dates
+            {% endif %}
+          </p>
           <table>
             <thead>
               <tr>{% for column in columns %}<th>{{ column }}</th>{% endfor %}</tr>
@@ -45,6 +68,13 @@
               {% else %}
                 <tr><td colspan="{{ columns|length }}">No records found for this report.</td></tr>
               {% endfor %}
+              {% if rows %}
+                <tr class="report-total-row">
+                  {% for column in columns %}
+                    <td>{{ totals[column] }}</td>
+                  {% endfor %}
+                </tr>
+              {% endif %}
             </tbody>
           </table>
         </div>
@@ -59,14 +89,33 @@
     .report-filters button, .report-filters a { margin-bottom:1rem; }
     .report-actions { display:flex; justify-content:space-between; align-items:center; margin-bottom:.75rem; }
     .report-actions span { display:flex; gap:.5rem; }
-    .report-actions a, .report-actions button { margin:0; }
+    .report-actions a, .report-actions button { margin:0; font-size: 1.1rem; padding: 0.5rem 2rem;}
+    .report-summary {
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+      gap:.75rem;
+      margin-bottom:1rem;
+    }
+    .report-summary div { border:1px solid #ddd; padding:.75rem; display:grid; gap:.25rem; }
+    .report-summary span { font-size:.9rem; }
+    .report-summary strong { font-size:1.3rem; }
     .report-table { overflow:auto; }
+    .report-total-row { font-weight:bold; border-top:2px solid currentColor; }
+    .report-table h2 {
+      font-size: 2.4rem;
+    }
+    thead {
+      font-size: 1.6rem;
+    }
     @media print {
-      header, aside, .report-tabs, .report-filters, .report-actions button, .report-actions a { display:none !important; }
+      header, aside, .report-tabs, .report-filters, .report-actions button, .report-actions a, .table-pagination, h1 { display:none !important; }
       .reports-page { width:100%; max-width:none; }
+      .A4-document-letterhead {
+        display: flex;
+      }
       main { margin:0; }
       table { font-size:10pt; }
-      @page { size:A4 landscape; margin:12mm; }
+      @page { size:A4 potrait; margin:6mm; }
     }
   </style>
 </body>

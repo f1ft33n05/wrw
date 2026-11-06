@@ -1,7 +1,7 @@
 {%include "header.html" %}
 <body>
   {% include "navbar.html" %}
-    <div class="dashboard-container row">
+    <div class="content-container row">
       {% include "sidebar.html" %}
       <main class="col-xs-12 col-md-9 dashboard-content">
         <div class="dashboard-heading">
@@ -19,23 +19,23 @@
         <section class="metric-grid">
           <article class="metric-card">
             <div><span class="metric-label">TOTAL SALES</span><strong>MWK {{ "{:,.2f}".format(metrics.total_sales) }}</strong></div>
-            <span class="metric-icon sales">&#x25A3;</span>
+            <span class="metric-icon sales"></span>
           </article>
           <article class="metric-card">
             <div><span class="metric-label">NET SALES</span><strong>MWK {{ "{:,.2f}".format(metrics.net_sales) }}</strong></div>
-            <span class="metric-icon net">&#36;</span>
+            <span class="metric-icon net"></span>
           </article>
           <article class="metric-card">
             <div><span class="metric-label">INVOICE DUE</span><strong>MWK {{ "{:,.2f}".format(metrics.invoice_due) }}</strong></div>
-            <span class="metric-icon due">&#9633;</span>
+            <span class="metric-icon due"></span>
           </article>
           <article class="metric-card">
             <div><span class="metric-label">TOTAL PURCHASE</span><strong>MWK {{ "{:,.2f}".format(metrics.total_purchases) }}</strong></div>
-            <span class="metric-icon purchase">&#8595;</span>
+            <span class="metric-icon purchase"></span>
           </article>
           <article class="metric-card">
             <div><span class="metric-label">PURCHASE DUE</span><strong>MWK {{ "{:,.2f}".format(metrics.purchase_due) }}</strong></div>
-            <span class="metric-icon warning">&#9888;</span>
+            <span class="metric-icon warning"></span>
           </article>
         </section>
 

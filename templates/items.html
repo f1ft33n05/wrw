@@ -5,7 +5,8 @@
     {% include "sidebar.html" %}
     <div class="col-xs-12 col-md-9">
       <main class="items-page">
-          <h1>Items</h1>          
+          <h1>Items</h1>
+          {% if user.role in ["admin", "manager"] %}
           <article class="item-create-form-container">
               <details>
                   <summary>Add +</summary>
@@ -33,6 +34,7 @@
                   </form>
               </details>
           </article>
+          {% endif %}
           <div class="overflow-auto">
             <table class="striped all-items-list">
               <thead>
@@ -60,9 +62,12 @@
                 <td>{{ item.selling_price_wholesale }}</td>
                 <td>{{ item.selling_price_retail }}</td>
                 <td>
+                  <button type="button" data-view-item data-id="{{ item.id }}" data-name="{{ item.name }}" data-barcode="{{ item.barcode }}" data-category="{{ item.category_id or '' }}" data-unit="{{ item.unit }}" data-quantity="{{ item.quantity }}" data-purchase="{{ item.purchase_price }}" data-wholesale="{{ item.selling_price_wholesale }}" data-retail="{{ item.selling_price_retail }}" data-description="{{ item.description or '' }}" data-threshold="{{ item.wholesale_threshold }}">View</button>
+                  {% if user.role in ["admin", "manager"] %}
                   <button type="button" data-edit-item data-id="{{ item.id }}" data-name="{{ item.name }}" data-barcode="{{ item.barcode }}" data-category="{{ item.category_id or '' }}" data-unit="{{ item.unit }}" data-quantity="{{ item.quantity }}" data-purchase="{{ item.purchase_price }}" data-wholesale="{{ item.selling_price_wholesale }}" data-retail="{{ item.selling_price_retail }}" data-description="{{ item.description or '' }}" data-threshold="{{ item.wholesale_threshold }}">Edit</button>
                   <button type="button" data-add-stock="{{ item.id }}">Add stock</button>
                   <button type="button" class="secondary" data-delete-item="{{ item.id }}">Delete</button>
+                  {% endif %}
                 </td>
               </tr>
               {% else %}
@@ -73,6 +78,47 @@
             </tbody>
           </table>
           </div>
+          <dialog id="item-details-view-dialog">
+            <article>
+              <h2>Item Details</h2>
+              <p id="item-details-error" role="alert"></p>
+              <dl class="row" id="item-details-summary">
+                <dt class="col-md-3">Name</dt><dd class="col-md-9" data-detail="name"></dd>
+                <dt class="col-md-3">Barcode</dt><dd class="col-md-9" data-detail="barcode"></dd>
+                <dt class="col-md-3">Description</dt><dd class="col-md-9" data-detail="description"></dd>
+                <dt class="col-md-3">Category</dt><dd class="col-md-9" data-detail="category"></dd>
+                <dt class="col-md-3">Stock</dt><dd class="col-md-9" data-detail="stock"></dd>
+                <dt class="col-md-3">Purchase price</dt><dd class="col-md-9" data-detail="purchase_price"></dd>
+                <dt class="col-md-3">Wholesale price</dt><dd class="col-md-9" data-detail="selling_price_wholesale"></dd>
+                <dt class="col-md-3">Retail price</dt><dd class="col-md-9" data-detail="selling_price_retail"></dd>
+                <dt class="col-md-3">Wholesale threshold</dt><dd class="col-md-9" data-detail="wholesale_threshold"></dd>
+              </dl>
+              <h3>Stock history</h3>
+              <div class="overflow-auto">
+                <table class="striped">
+                  <thead><tr><th>Date</th><th>Type</th><th>Quantity</th><th>Note</th></tr></thead>
+                  <tbody id="item-details-movements"><tr><td colspan="4">Loading...</td></tr></tbody>
+                </table>
+              </div>
+              <h3>Sold lines</h3>
+              <div class="overflow-auto">
+                <table class="striped">
+                  <thead><tr><th>Date</th><th>Sale</th><th>Quantity</th><th>Unit price</th><th>Discount</th><th>Total</th><th>Payment</th></tr></thead>
+                  <tbody id="item-details-sales"><tr><td colspan="7">Loading...</td></tr></tbody>
+                </table>
+              </div>
+              <h3>Purchase lines</h3>
+              <div class="overflow-auto">
+                <table class="striped">
+                  <thead><tr><th>Date</th><th>Purchase</th><th>Quantity</th><th>Unit cost</th><th>Total</th></tr></thead>
+                  <tbody id="item-details-purchases"><tr><td colspan="5">Loading...</td></tr></tbody>
+                </table>
+              </div>
+              <footer>
+                <button type="button" class="secondary" data-close-item-details>Close</button>
+              </footer>
+            </article>
+          </dialog>
           <dialog id="item-edit-dialog">
             <article>
               <h2>Edit item</h2>

@@ -109,9 +109,93 @@ async def adjust_stock(item_id: int, payload: StockAdjustmentRequest, db: db_dep
     current = Decimal(str(item.quantity or "0"))
     item.quantity = str(current + payload.quantity)
     item.updated_at = timestamp
-    db.add(StockMvt(item_id=item_id, quantity=str(payload.quantity), movement_type="in", created_at=timestamp, updated_at=timestamp))
+    db.add(StockMvt(item_id=item_id, quantity=str(payload.quantity), movement_type="in", note=payload.reason, created_at=timestamp, updated_at=timestamp))
     db.commit()
     return {"id": item.id, "quantity": item.quantity}
+
+
+@router.get(
+    "/{item_id}/details",
+    dependencies=[Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))],
+)
+async def item_details(item_id: int, db: db_dependency):
+    item = db.query(Item).filter(Item.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    category = db.query(ItemCategory).filter(ItemCategory.id == item.category_id).first()
+    sales = (
+        db.query(SalesTxn)
+        .filter(SalesTxn.item_id == item_id)
+        .order_by(SalesTxn.created_at.desc(), SalesTxn.id.desc())
+        .all()
+    )
+    purchase_rows = (
+        db.query(PurchaseLines, Purchases)
+        .join(Purchases, PurchaseLines.purchase_id == Purchases.id)
+        .filter(PurchaseLines.item_id == item_id)
+        .order_by(Purchases.created_at.desc(), PurchaseLines.id.desc())
+        .all()
+    )
+    movements = (
+        db.query(StockMvt)
+        .filter(StockMvt.item_id == item_id)
+        .order_by(StockMvt.created_at.desc(), StockMvt.id.desc())
+        .all()
+    )
+
+    return {
+        "item": {
+            "id": item.id,
+            "name": item.name,
+            "description": item.description or "",
+            "barcode": item.barcode,
+            "category": category.name if category else "Uncategorised",
+            "unit": item.unit,
+            "quantity": item.quantity,
+            "purchase_price": item.purchase_price,
+            "selling_price_wholesale": item.selling_price_wholesale,
+            "selling_price_retail": item.selling_price_retail,
+            "wholesale_threshold": item.wholesale_threshold or "6",
+            "created_at": serialize_timestamp(item.created_at),
+            "updated_at": serialize_timestamp(item.updated_at),
+        },
+        "sales": [
+            {
+                "id": sale.id,
+                "quantity": sale.quantity,
+                "unit_price": sale.unit_price,
+                "price_type": sale.price_type,
+                "total_price": sale.total_price,
+                "discount_amount": sale.discount_amount,
+                "payment_method": sale.payment_method,
+                "location": sale.location,
+                "created_at": serialize_timestamp(sale.created_at),
+            }
+            for sale in sales
+        ],
+        "purchases": [
+            {
+                "id": purchase.id,
+                "purchase_id": parent.id,
+                "quantity": purchase.quantity,
+                "unit_cost": purchase.unit_cost,
+                "total_amount": purchase.total_amount,
+                "created_at": serialize_timestamp(parent.created_at),
+            }
+            for purchase, parent in purchase_rows
+        ],
+        "movements": [
+            {
+                "id": movement.id,
+                "quantity": movement.quantity,
+                "movement_type": movement.movement_type,
+                "note": movement.note or "",
+                "created_at": serialize_timestamp(movement.created_at),
+            }
+            for movement in movements
+        ],
+    }
 
 
 @router.get("/categories", response_class=HTMLResponse)

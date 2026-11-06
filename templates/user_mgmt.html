@@ -4,13 +4,13 @@
     <div class="content-container row">
       {% include "sidebar.html" %}
       <main class="col-xs-12 col-md-9">
-        <article class="all-users-container">
+        <div class="all-users-container">
             <header class="row">
                 <section class="title col-xs-12 col-md-3">
                     <h1>All Users</h1>
                 </section>
-                <span class="spacer col-xs-12 col-md-7"></span>
-                <button class="primary col-xs-12 col-md-2" type="button" data-add-user>Add</button>
+                <span class="spacer col-xs-12 col-md-8"></span>
+                <button class="primary col-xs-12 col-md-1" type="button" data-add-user>Add</button>
             </header>
             <table class="striped">
                 <thead>
@@ -60,7 +60,7 @@
                     {% endfor %}
                 </tbody>
             </table>
-        </article>
+        </div>
         <dialog id="user-create-dialog">
             <article>
                 <h2>Add User</h2>
@@ -118,16 +118,15 @@
                 <p>Are you sure you want to delete <strong id="delete-user-name"></strong>?</p>
                 <p id="delete-user-error" role="alert"></p>
                 <footer class="row">
-                    <div class="spacer col-xs-12 col-md-6"></div>
+                    <div class="spacer col-xs-12 col-md-7"></div>
                     <button class="secondary col-xs-12 col-md-2" type="button" data-cancel-delete>Cancel</button>
-                    <div class="spacer col-xs-12 col-md-1"></div>
                     <button type="submit" id="confirm-delete-user" class="col-xs-12 col-md-2">Confirm</button>
                 </footer>
             </article>
         </dialog>
         <dialog id="user-edit-dialog">
             <article>
-                <h2>Edit user</h2>
+                <h2>Edit user info</h2>
                 <form id="user-edit-form">
                     <div class="names row">
                         <label class="col-xs-12 col-md-5">

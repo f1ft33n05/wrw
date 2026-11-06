@@ -8,7 +8,7 @@
                 <summary>Users</summary>
                 <ul>
                   <li><a href="/users/"{% if request.path == "/users/" or request.path == "/users" %} aria-current="page"{% endif %}>All Users</a></li>
-                  <li><a href="/roles/"{% if request.path.startswith("/roles") %} aria-current="page"{% endif %}>Roles</a></li>
+                  <!-- <li><a href="/roles/"{% if request.path.startswith("/roles") %} aria-current="page"{% endif %}>Roles</a></li> -->
                 </ul>
               </details>
             </li>
@@ -28,7 +28,9 @@
                 <summary>Items</summary>
                 <ul>
                   <li><a href="/items">List Items</a></li>
+                  {% if user.role in ["admin", "manager"] %}
                   <li><a href="/items/import/page">Import Items</a></li>
+                  {% endif %}
                   <li><a href="/items/categories">Categories</a></li>
                   <li><a href="/items/discounts">Discounts</a></li>
                 </ul>
@@ -49,9 +51,10 @@
             </li>
             <li><a href="/sales/receipts"{% if request.path == "/sales/receipts" %} aria-current="page"{% endif %}>Receipts</a></li>
             <li><a href="/sales/payments"{% if request.path == "/sales/payments" %} aria-current="page"{% endif %}>Payments</a></li>
+            
+            {% if user.role in ["admin", "manager"] %}
             <li><a href="/quotations">Quotes</a></li>
             <li><a href="/invoices">Invoices</a></li>
-            {% if user.role in ["admin", "manager"] %}
             <li><a href="/purchases">Purchases</a></li>
             {% endif %}
             <li>

@@ -9,7 +9,9 @@
             </summary>
             <ul dir="rtl">
               <li><a href="/profile">Profile</a></li>
+              {% if user.role == ['admin', 'manager'] %}
               <li><a href="/settings">Settings</a></li>
+              {% endif %}
               <li>
                 <form action="/auth/logout" method="post">
                   <button type="submit" class="logout-link">Log out</button>

@@ -4,22 +4,26 @@
   <div class="content-container row">
     {% include "sidebar.html" %}
     <main class="col-xs-12 col-md-9">
-      <h1>My profile</h1>
+      <h1>My Profile</h1>
       {% if request.query_params.get("updated") == "1" %}
         <p>Profile updated successfully.</p>
       {% endif %}
-      <article>
-        <form method="post" action="/profile">
-          <label>Username<input type="text" value="{{ profile.username }}" disabled></label>
-          <label>Name<input name="name" value="{{ profile.name }}" required></label>
-          <label>Email<input name="email" type="email" value="{{ profile.email or '' }}" required></label>
-          <label>Phone<input name="phone" type="tel" value="{{ profile.phone or '' }}" required></label>
+      <article style="margin-top: 3rem;">
+        <form id="profile-edit-form" method="post" action="/profile">
+          <div class="row">
+            <label class="col-xs-12 col-md-6">Username<input type="text" value="{{ profile.username }}" disabled></label>
+            <label class="col-xs-12 col-md-6">Name<input name="name" value="{{ profile.name }}" required></label>
+          </div>
+          <div class="row">
+            <label class="col-xs-12 col-md-6">Email<input name="email" type="email" value="{{ profile.email or '' }}" required></label>
+            <label class="col-xs-12 col-md-6">Phone<input name="phone" type="tel" value="{{ profile.phone or '' }}" required></label>
+          </div>
           <fieldset>
             <legend>Change password</legend>
-            <label>Current password<input name="current_password" type="password" autocomplete="current-password"></label>
-            <label>New password<input name="new_password" type="password" minlength="8" maxlength="72" autocomplete="new-password"></label>
+            <label class="col-xs-12 col-md-6">Current password<input name="current_password" type="password" autocomplete="current-password"></label>
+            <label class="col-xs-12 col-md-6">New password<input name="new_password" type="password" minlength="8" maxlength="72" autocomplete="new-password"></label>
           </fieldset>
-          <button type="submit">Save profile</button>
+          <button type="submit">Save</button>
         </form>
       </article>
     </main>

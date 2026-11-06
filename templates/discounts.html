@@ -6,6 +6,7 @@
       <div class="col-xs-12 col-md-9">
       <main class="items-page">
         <h1>Discounts</h1>
+        {% if user.role in ["admin", "manager"] %}
         <article class="item-create-form-container">
             <details>
                 <summary>Add +</summary>
@@ -33,7 +34,7 @@
                 </form>
             </details>
         </article>
-        
+        {% endif %}
         <table class="striped">
           <thead><tr><th>Name</th><th>Type</th><th>Target</th><th>Percentage</th><th>Active</th></tr></thead>
           <tbody>

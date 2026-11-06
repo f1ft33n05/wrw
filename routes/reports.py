@@ -23,6 +23,8 @@ from database_models import (
     PurchaseLines,
     Purchases,
     SalesTxn,
+    Payments,
+    SupplierPayments,
 )
 from models import Role
 from routes.auth import RoleChecker, get_current_user
@@ -32,18 +34,18 @@ router = APIRouter(tags=["reports"])
 templates = Jinja2Templates(directory="templates")
 REPORT_ACCESS = Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))
 REPORT_TYPES = {
-    "sales": "Sales report",
-    "inventory": "Inventory report",
-    "trending": "Trending products",
-    "purchases": "Purchase report",
-    "purchase-sale": "Purchase & sale report",
+    "sales": "Sales Report",
+    "inventory": "Inventory Report",
+    "trending": "Trending Products",
+    "purchases": "Purchase Report",
+    "purchase-sale": "Purchase & Sale Report",
 }
 user_dependency = Annotated[dict, Depends(get_current_user)]
 
 
 def decimal_value(value, default="0"):
     try:
-        result = Decimal(str(value or default))
+        result = Decimal(str(value or default).replace(",", "").strip())
     except (InvalidOperation, ValueError):
         return Decimal(default)
     return result if result.is_finite() else Decimal(default)
@@ -51,6 +53,16 @@ def decimal_value(value, default="0"):
 
 def money(value):
     return f"{decimal_value(value):,.2f}"
+
+
+def report_date_range(date_from: str | None, date_to: str | None):
+    if date_from and date_to:
+        return f"{date_from} to {date_to}"
+    if date_from:
+        return f"From {date_from}"
+    if date_to:
+        return f"Up to {date_to}"
+    return "All dates"
 
 
 def report_date(value):
@@ -72,6 +84,85 @@ def in_period(value, date_from: str | None, date_to: str | None):
 
 def safe_number(value):
     return decimal_value(value)
+
+
+def numeric_total_column(column):
+    name = column.lower()
+    return (
+        name == "total"
+        or name == "quantity"
+        or name.endswith(" qty")
+        or name.endswith(" quantity")
+        or name == "transactions"
+        or name.endswith(" value")
+        or name == "gross difference"
+        or name.endswith(" price")
+        or name.endswith(" amount")
+    )
+
+
+def report_totals(columns, rows, report_type=None):
+    totals = {column: "" for column in columns}
+    totals[columns[0]] = "Total"
+    for column in columns:
+        inventory_column = report_type == "inventory" and column.lower() in {
+            "quantity",
+            "purchase price",
+            "stock value",
+        }
+        if not inventory_column and not numeric_total_column(column):
+            continue
+        name = column.lower()
+        total = sum((decimal_value(row.get(column)) for row in rows), Decimal("0"))
+        if name == "transactions":
+            totals[column] = str(int(total))
+        elif name == "quantity" or name.endswith(" qty") or name.endswith(" quantity"):
+            totals[column] = f"{total:f}".rstrip("0").rstrip(".") or "0"
+        else:
+            totals[column] = money(total)
+    return totals
+
+
+def financial_summary(db, date_from=None, date_to=None):
+    invoices = db.query(Invoices).all()
+    filtered_invoices = [row for row in invoices if in_period(row.created_at, date_from, date_to)]
+    total_sales = sum((safe_number(row.total_price) for row in filtered_invoices if (row.status or "").lower() != "cancelled"), Decimal("0"))
+    paid_invoice_ids = {row.id for row in filtered_invoices}
+
+    payments = db.query(Payments).all()
+    filtered_payments = [
+        row for row in payments
+        if in_period(row.created_at, date_from, date_to)
+        and row.invoice_id in paid_invoice_ids
+        and (row.status or "completed").lower() != "failed"
+    ]
+    total_payments = sum((safe_number(row.amount) for row in filtered_payments), Decimal("0"))
+
+    purchases = db.query(Purchases).all()
+    filtered_purchases = [row for row in purchases if in_period(row.created_at, date_from, date_to)]
+    total_purchases = sum((safe_number(row.total_amount) for row in filtered_purchases), Decimal("0"))
+
+    supplier_payments = db.query(SupplierPayments).all()
+    purchase_ids = {row.id for row in filtered_purchases}
+    total_supplier_payments = sum((
+        safe_number(row.amount) for row in supplier_payments
+        if row.purchase_id in purchase_ids and in_period(row.created_at, date_from, date_to)
+    ), Decimal("0"))
+
+    inventory_value = sum((
+        safe_number(item.quantity) * safe_number(item.purchase_price)
+        for item in db.query(Item).all()
+    ), Decimal("0"))
+
+    return {
+        "total_sales": money(total_sales),
+        "total_payments": money(total_payments),
+        "receipts": len(filtered_payments),
+        "total_purchases": money(total_purchases),
+        "supplier_payments": money(total_supplier_payments),
+        "inventory_value": money(inventory_value),
+        "accounts_receivable": money(max(total_sales - total_payments, Decimal("0"))),
+    }
 
 
 def sales_data(db, date_from, date_to):
@@ -232,6 +323,8 @@ async def reports_page(
     if report_type not in REPORT_TYPES:
         report_type = "sales"
     columns, rows = report_data(db, report_type, date_from, date_to)
+    totals = report_totals(columns, rows, report_type)
+    summary = financial_summary(db, date_from, date_to)
     return templates.TemplateResponse(request, "reports.html", {
         "user": user,
         "report_type": report_type,
@@ -242,6 +335,8 @@ async def reports_page(
         "date_from": date_from or "",
         "date_to": date_to or "",
         "row_count": len(rows),
+        "totals": totals,
+        "summary": summary,
     })
 
 
@@ -257,13 +352,30 @@ async def export_report(
         raise HTTPException(status_code=404, detail="Report not found")
     columns, rows = report_data(db, report_type, date_from, date_to)
     title = REPORT_TYPES[report_type]
+    date_range = report_date_range(date_from, date_to)
     filename = report_type.replace("-", "_")
+    totals = report_totals(columns, rows, report_type)
+    summary = financial_summary(db, date_from, date_to)
 
     if file_format == "csv":
         output = StringIO()
+        output.write(f"{title}\n")
+        output.write(f"Date range: {date_range}\n\n")
         writer = csv.DictWriter(output, fieldnames=columns)
         writer.writeheader()
         writer.writerows(rows)
+        writer.writerow(totals)
+        output.write("\nFinancial Totals\n")
+        for label, key in (
+            ("Total Sales", "total_sales"),
+            ("Total Payments", "total_payments"),
+            ("Receipts", "receipts"),
+            ("Total Purchases", "total_purchases"),
+            ("Supplier Payments", "supplier_payments"),
+            ("Inventory Value", "inventory_value"),
+            ("Accounts Receivable", "accounts_receivable"),
+        ):
+            output.write(f"{label},{summary[key]}\n")
         return StreamingResponse(
             iter([output.getvalue()]),
             media_type="text/csv",
@@ -279,15 +391,38 @@ async def export_report(
         worksheet["A1"].font = Font(size=16, bold=True, color="FFFFFF")
         worksheet["A1"].fill = PatternFill("solid", fgColor="6D2C91")
         worksheet["A1"].alignment = Alignment(horizontal="center")
+        worksheet.append([f"Date range: {date_range}"])
+        worksheet.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(columns))
+        worksheet["A2"].alignment = Alignment(horizontal="center")
         worksheet.append(columns)
-        for cell in worksheet[2]:
+        for cell in worksheet[3]:
             cell.font = Font(bold=True, color="FFFFFF")
             cell.fill = PatternFill("solid", fgColor="8B4DB5")
         for row in rows:
             worksheet.append([row.get(column, "") for column in columns])
+        worksheet.append([totals.get(column, "") for column in columns])
+        for cell in worksheet[worksheet.max_row]:
+            cell.font = Font(bold=True)
+        summary_row = worksheet.max_row + 2
+        worksheet.cell(summary_row, 1, "Financial Totals")
+        worksheet.cell(summary_row, 1).font = Font(bold=True)
+        for label, key in (
+            ("Total Sales", "total_sales"),
+            ("Total Payments", "total_payments"),
+            ("Receipts", "receipts"),
+            ("Total Purchases", "total_purchases"),
+            ("Supplier Payments", "supplier_payments"),
+            ("Inventory Value", "inventory_value"),
+            ("Accounts Receivable", "accounts_receivable"),
+        ):
+            summary_row += 1
+            worksheet.cell(summary_row, 1, label)
+            worksheet.cell(summary_row, 2, summary[key])
+            worksheet.cell(summary_row, 1).font = Font(bold=True)
+            worksheet.cell(summary_row, 2).font = Font(bold=True)
         for index, column in enumerate(columns, start=1):
             worksheet.column_dimensions[worksheet.cell(1, index).column_letter].width = max(12, min(35, len(column) + 4))
-        for row in worksheet.iter_rows(min_row=3):
+        for row in worksheet.iter_rows(min_row=4):
             for cell in row:
                 cell.alignment = Alignment(vertical="top", wrap_text=True)
         output = BytesIO()
@@ -304,8 +439,25 @@ async def export_report(
         page_size = landscape(A4)
         document = SimpleDocTemplate(output, pagesize=page_size, title=title)
         styles = getSampleStyleSheet()
-        story = [Paragraph(title, styles["Title"]), Spacer(1, 12)]
+        story = [
+            Paragraph(title, styles["Title"]),
+            Paragraph(f"Date range: {date_range}", styles["Normal"]),
+            Spacer(1, 12),
+        ]
+        story.append(Paragraph("<b>Financial Totals</b>", styles["Heading2"]))
+        for label, key in (
+            ("Total Sales", "total_sales"),
+            ("Total Payments", "total_payments"),
+            ("Receipts", "receipts"),
+            ("Total Purchases", "total_purchases"),
+            ("Supplier Payments", "supplier_payments"),
+            ("Inventory Value", "inventory_value"),
+            ("Accounts Receivable", "accounts_receivable"),
+        ):
+            story.append(Paragraph(f"<b>{label}:</b> {summary[key]}", styles["Normal"]))
+        story.append(Spacer(1, 12))
         table_data = [columns] + [[str(row.get(column, "")) for column in columns] for row in rows]
+        table_data.append([str(totals.get(column, "")) for column in columns])
         table = Table(table_data, repeatRows=1)
         table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#6D2C91")),
@@ -315,6 +467,7 @@ async def export_report(
             ("FONTSIZE", (0, 0), (-1, -1), 8),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F4EDF7")]),
+            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
         ]))
         story.append(table)
         document.build(story)

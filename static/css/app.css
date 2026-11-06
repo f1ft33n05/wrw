@@ -16,6 +16,15 @@ h1 {
     font-size: 2.4rem;
 }
 
+input, select {
+    font-size: 1.6rem;
+    height: 4rem;
+}
+
+.all-users-container button {
+    border: none;
+}
+
 header nav {
     width: 90%;
     margin: auto;
@@ -30,7 +39,7 @@ details.dropdown>summary+ul {
 }
 
 tbody {
-    font-size: 1.5rem;
+    font-size: 1.4rem;
 }
 
 /* Hide scrollbar for all major modern and legacy browsers */
@@ -70,6 +79,10 @@ tbody {
     width: 100%;
     margin: auto;
     padding: 2rem;
+}
+
+.content-container > main {
+    padding-left: 4rem;
 }
 
 
@@ -382,6 +395,36 @@ tbody {
     font-size: 1.5rem;
 }
 
+.all-users-container details {
+    margin: 2rem 0;
+    padding: 2rem;
+    width: 50%;
+}
+
+.all-users-container table button{
+    font-size: 1.2rem;
+    padding: .5rem 1rem;
+}
+
+#user-create-form {
+    margin-top: 2rem;
+}
+
+#user-create-form input {
+    padding: 2rem;
+}
+#user-create-form label {
+    font-size: 1.6rem;
+}
+
+#user-edit-form input {
+    height: 4rem;
+}
+
+#user-delete-dialog footer {
+    background: transparent;
+}
+
 #user-create-dialog article, #user-edit-dialog article, #user-delete-dialog article, #contact-create-dialog article, #contact-edit-dialog article, #contact-delete-dialog article{
     padding: 4rem;
 }
@@ -400,6 +443,9 @@ tbody {
 }
 
 /* CONTACTS */
+.contcts details {
+    width: 50%;
+}
 .contcts h1 {
     font-size: 2.4rem;
     margin-bottom: 4rem;
@@ -416,17 +462,24 @@ tbody {
     display : none;
 }
 
+.contcts table button, .contcts table a {
+    font-size: 1.2rem;
+}
+
 #contact-create-form {
     margin-top: 2rem;
 }
 
 #contact-create-form button{
-    width: 50%;
+    width: fit-content;
     font-size: 1.6rem;
+    padding: 1rem 2rem;
+
 }
 
 #contact-create-form input {
     font-size: 1.6rem;
+    height: 4rem;
 }
 
 /* ITEMS */
@@ -436,7 +489,7 @@ tbody {
     text-align: left;
 }
 
-.items-page summary, .all-sales-container summary, .event-create-form-container summary, .reseller-pay-add, .purchase-form-container summary {
+.items-page summary, .all-sales-container summary, .event-create-form-container summary, .reseller-pay-add, .purchase-form-container summary, .all-users-container summary {
     width: fit-content;
     background-color: var(--pico-primary);
     color: #fff;
@@ -445,12 +498,16 @@ tbody {
     font-size: 1.6rem;
 }
 
-.items-page summary::after, .all-sales-container summary::after, .event-create-form-container summary::after, .purchase-form-container summary::after {
+.items-page summary::after, .all-sales-container summary::after, .event-create-form-container summary::after, .purchase-form-container summary::after, .all-users-container summary::after {
     display : none;
 }
 
 .items-page tbody tr td {
     font-size: 1.6rem;
+}
+
+.all-items-list td{
+    font-size: 1.3rem;
 }
 
 .all-items-list button {
@@ -578,7 +635,7 @@ tbody {
 .events-grid {
     margin-top: 3rem;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: 1.2rem;
 }
 
@@ -845,6 +902,9 @@ tbody {
 
 
 /* SIDEBAR */
+.content-container >aside li {
+    margin-bottom: 1rem;
+}
 
 aside details ul {
     padding-left: 2rem;
@@ -859,7 +919,7 @@ aside details ul {
     gap: 0.75rem;
     justify-content: space-between;
     margin-top: 1.5rem;
-    font-size: 1.5rem;
+    font-size: 1.3rem;
 }
 .table-pagination label {
     align-items: center;
@@ -878,9 +938,10 @@ aside details ul {
     display: flex;
     gap: 0.35rem;
 }
-.table-pagination button {
+.table-pagination button{
     margin: 0;
     padding: 0.35rem 0.65rem;
+    font-size: 1.3rem;
 }
 .table-pagination button[disabled] {
     cursor: not-allowed;
@@ -889,4 +950,85 @@ aside details ul {
 .table-pagination-summary {
     color: var(--pico-muted-color);
     margin: 0;
+}
+
+.table-pagination select {
+    height: 3rem;
+    font-size: 1.3rem;
+    padding: 0 1rem;
+}
+
+/* REPORTS */
+
+.report-tabs a{
+    font-size: 1.5rem;
+}
+
+.report-filters {
+    margin-top: 3rem;
+    width: 50%;
+}
+
+.report-filters button {
+    width: fit-content;
+    padding: 0.7rem 2rem;
+    font-size: 1.6rem;
+}
+
+.report-filters input {
+    margin-top: 1rem;
+    height: 4rem;
+}
+
+.report-filters label {
+    font-size: 1.6rem;
+}
+
+.report-actions {
+    margin-top: 4rem;
+}
+
+.A4-document-letterhead {
+    display: none;
+    justify-content: space-between;
+    border-bottom: .1rem solid rgba(32,40,50,.08);
+    margin-bottom: 3rem;
+}
+
+.letterhead-logo {
+    width: 30rem;
+}
+
+.letterhead-contact-info {
+    text-align: right;
+}
+
+.report-date-range {
+    margin-bottom: 2rem;
+}
+
+#profile-edit-form {
+    padding: 2rem;
+}
+
+#profile-edit-form label {
+    font-size: 1.6rem;
+}
+
+#profile-edit-form input {
+    height: 4rem;
+}
+
+#profile-edit-form button {
+    width: fit-content;
+    padding: 1rem 3rem;
+    font-size: 1.5rem;
+}
+
+#profile-edit-form fieldset {
+    margin-top: 2rem;
+}
+
+#profile-edit-form legend {
+    font-weight: bold;
 }
