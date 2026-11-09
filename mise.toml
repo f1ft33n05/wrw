@@ -1,2 +1,2 @@
 [settings]
-python.compile = false
+python.compile = true
