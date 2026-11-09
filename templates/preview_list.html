@@ -1,0 +1,21 @@
+<section class="preview-list col-xs-12 col-md-3 no-print">
+  <h2>{{ preview_list_title }}</h2>
+  <nav aria-label="{{ preview_list_title }}">
+    <ul class="preview-list-items">
+      {% for item in preview_items %}
+      <li>
+        <a class="preview-list-item" href="{{ item.href }}"{% if item.active %} aria-current="page"{% endif %}>
+          <span class="preview-list-item-heading">
+            <strong>{{ item.title }}</strong>
+            {% if item.amount_text %}<strong>{{ item.amount_text }}</strong>{% endif %}
+          </span>
+          {% if item.detail %}<span class="preview-list-item-detail">{{ item.detail }}</span>{% endif %}
+          {% if item.status %}<small>{{ item.status|upper }}</small>{% endif %}
+        </a>
+      </li>
+      {% else %}
+      <li><p>No {{ preview_list_title|lower }} found.</p></li>
+      {% endfor %}
+    </ul>
+  </nav>
+</section>

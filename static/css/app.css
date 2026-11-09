@@ -4,6 +4,7 @@ html {
 
 body {
     font-size: 1.8rem;
+    max-height: 100vh;
 }
 
 header {
@@ -81,8 +82,8 @@ tbody {
     padding: 2rem;
 }
 
-.content-container > main {
-    padding-left: 4rem;
+.content-container > main, .items-page {
+    padding-left: 2rem;
 }
 
 
@@ -366,7 +367,7 @@ tbody {
 }
 
 .dashboard-date-filter input, .dashboard-date-filter button {
-    line-height: 2.5rem;
+    height: 4rem;
     padding: 0.5rem;
     margin-top: 1rem;
     font-size: 1.6rem;
@@ -444,7 +445,7 @@ tbody {
 
 /* CONTACTS */
 .contcts details {
-    width: 50%;
+    margin-bottom: 3rem;
 }
 .contcts h1 {
     font-size: 2.4rem;
@@ -545,6 +546,7 @@ tbody {
     margin-top: 2rem;
     padding: 2rem;
     margin-bottom: 2rem;
+    width: 100%;
 }
 
 
@@ -900,6 +902,110 @@ tbody {
 
 }
 
+.preview-list
+{
+        max-width: 100% !important;
+}
+
+.preview-list h2 {
+    font-size: 2.4rem;
+    margin-bottom: 1rem;
+}
+
+.preview-list nav {
+    margin: 0;
+    width: 100%;
+}
+
+.preview-list-items {
+    display: block;
+    list-style: none;
+    margin: 0;
+    max-height: calc(100vh - 20rem);
+    overflow-y: auto;
+    padding: 0;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    width: 100%;
+}
+
+.preview-list-items::-webkit-scrollbar {
+    display: none;
+}
+
+.preview-list-items li {
+    width: 100%;
+    margin: 0;
+}
+.preview-list-items li a {
+    padding: 0.5rem;
+}
+
+.preview-list-item {
+    border-bottom: 1px solid var(--pico-muted-border-color);
+    color: inherit;
+    display: block;
+    padding: 1rem 0.75rem;
+    text-decoration: none;
+}
+
+.preview-list-item[aria-current="page"] {
+    background: var(--pico-card-background-color);
+}
+
+.preview-list-item-heading {
+    align-items: flex-start;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+}
+
+.preview-list-item-heading strong:first-child {
+    overflow-wrap: anywhere;
+}
+
+.preview-list-item-heading strong:last-child {
+    flex-shrink: 0;
+    font-size: 1.2rem;
+}
+
+.preview-list-item-detail {
+    display: block;
+    font-size: 1.3rem;
+    margin-top: 0.25rem;
+    opacity: 0.75;
+}
+
+.preview-list-item small {
+    display: block;
+    margin-top: 0.25rem;
+}
+
+.client-document-metadata {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 1rem;
+    align-items: start;
+
+}
+
+.statement-A4-preview {
+    padding: 2rem;
+}
+
+
+.A4-contact-details-metadata p {
+    line-height: 1.5rem;
+}
+
+.statement-date {
+    margin-bottom: 2rem;
+}
+
+.statement-table thead {
+    font-size: 1.5rem;
+}
 
 /* SIDEBAR */
 .content-container >aside li {

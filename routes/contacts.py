@@ -59,6 +59,16 @@ async def supplier_statement(
     if supplier is None:
         raise HTTPException(status_code=404, detail="Supplier not found")
 
+    suppliers = (
+        db.query(Contact)
+        .filter(Contact.contact_type == "supplier")
+        .order_by(Contact.name)
+        .all()
+    )
+    supplier_balances = {
+        row.id: contact_balance(db, row) for row in suppliers
+    }
+
     purchases = (
         db.query(Purchases)
         .filter(Purchases.supplier_id == supplier_id)
@@ -120,6 +130,17 @@ async def supplier_statement(
         {
             "user": user,
             "supplier": supplier,
+            "preview_list_title": "Suppliers",
+            "preview_items": [
+                {
+                    "href": f"/suppliers/{row.id}/statement",
+                    "title": row.name,
+                    "detail": "",
+                    "amount_text": f"Balance: {format_money(supplier_balances[row.id])}",
+                    "active": row.id == supplier.id,
+                }
+                for row in suppliers
+            ],
             "transactions": transactions,
             "balance_due": max(balance, Decimal("0")),
             "statement_date": datetime.now(APP_TIMEZONE),

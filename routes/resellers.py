@@ -85,6 +85,24 @@ def _balance_due(db, reseller_id: int) -> Decimal:
     return max(_reconciled_total(db, reseller_id) - _paid_total(db, reseller_id), Decimal("0"))
 
 
+def _statement_balance_due(db, reseller_id: int) -> Decimal:
+    reconciled = _reconciled_total(db, reseller_id)
+    legacy_transactions = (
+        db.query(ResellerTxns)
+        .filter(ResellerTxns.reseller_id == reseller_id)
+        .all()
+    )
+    legacy_total = sum(
+        (
+            decimal_value(row.total_price, "reseller transaction")
+            for row in legacy_transactions
+            if row.total_price not in (None, "")
+        ),
+        Decimal("0"),
+    )
+    return max(reconciled + legacy_total - _paid_total(db, reseller_id), Decimal("0"))
+
+
 @router.get(
     "/reseller_pg",
     response_class=HTMLResponse,
@@ -251,6 +269,13 @@ async def reseller_statement(
     if reseller is None:
         raise HTTPException(status_code=404, detail="Reseller not found")
 
+    resellers = (
+        db.query(Contact)
+        .filter(Contact.contact_type == "reseller")
+        .order_by(Contact.name)
+        .all()
+    )
+
     transactions = []
 
     allocations = (
@@ -353,6 +378,17 @@ async def reseller_statement(
         {
             "user": user,
             "reseller": reseller,
+            "preview_list_title": "Resellers",
+            "preview_items": [
+                {
+                    "href": f"/resellers/{row.id}/statement",
+                    "title": row.name,
+                    "detail": "",
+                    "amount_text": f"Balance: {format_money(_statement_balance_due(db, row.id))}",
+                    "active": row.id == reseller.id,
+                }
+                for row in resellers
+            ],
             "transactions": transactions,
             "balance_due": max(balance, Decimal("0")),
             "statement_date": datetime.now(APP_TIMEZONE),

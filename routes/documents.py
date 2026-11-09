@@ -8,7 +8,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from database import db_dependency
-from database_models import Contact, Invoices, Item, Quotations
+from database_models import Contact, Invoices, Item, Payments, Quotations
 from models import DocumentRequest, Role
 from routes.auth import RoleChecker, get_current_user
 from routes.settings import get_settings
@@ -76,14 +76,39 @@ def _totals(lines: list[dict], tax_rate: Decimal, discount_amount: Decimal) -> d
     }
 
 
+def _document_amount_text(currency: str, amount: Decimal, label: str) -> str:
+    return f"{label}: {currency} {money(amount):,.2f}"
+
+
+def _metadata_value(value: object | None) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return None if text.lower() in {"", "none", "null"} else text
+
+
+def _document_issue_date(document) -> str | None:
+    issue_date = _metadata_value(document.issue_date)
+    if issue_date:
+        return issue_date
+    created_at = _metadata_value(document.created_at)
+    if not created_at:
+        return None
+    try:
+        return datetime.fromisoformat(created_at.replace("Z", "+00:00")).date().isoformat()
+    except ValueError:
+        return created_at[:10] if len(created_at) >= 10 else created_at
+
+
 @router.get("/quotations", response_class=HTMLResponse, dependencies=[DOCUMENT_ACCESS])
 async def quotations_page(request: Request, user: user_dependency, db: db_dependency):
     items = db.query(Item).order_by(Item.name).all()
     customers = db.query(Contact).filter(Contact.contact_type == "customer").order_by(Contact.name).all()
+    customer_names = {customer.id: customer.name for customer in customers}
     quotations = db.query(Quotations).order_by(Quotations.id.desc()).all()
     return templates.TemplateResponse(request, "document_list.html", {
         "user": user, "document_type": "quotation", "documents": quotations,
-        "items": items, "customers": customers,
+        "items": items, "customers": customers, "customer_names": customer_names,
     })
 
 
@@ -124,9 +149,10 @@ async def invoices_page(request: Request, user: user_dependency, db: db_dependen
     invoices = db.query(Invoices).order_by(Invoices.id.desc()).all()
     items = db.query(Item).order_by(Item.name).all()
     customers = db.query(Contact).filter(Contact.contact_type == "customer").order_by(Contact.name).all()
+    customer_names = {customer.id: customer.name for customer in customers}
     return templates.TemplateResponse(request, "document_list.html", {
         "user": user, "document_type": "invoice", "documents": invoices,
-        "items": items, "customers": customers,
+        "items": items, "customers": customers, "customer_names": customer_names,
     })
 
 
@@ -198,7 +224,56 @@ def _render_document(request, user, db, model, document_id, document_type):
     document = db.query(model).filter(model.id == document_id).first()
     if document is None:
         raise HTTPException(status_code=404, detail=f"{document_type.title()} not found")
-    customer = db.query(Contact).filter(Contact.id == document.customer_id).first()
+    documents = db.query(model).order_by(model.id.desc()).all()
+    customer_ids = {row.customer_id for row in documents if row.customer_id is not None}
+    customers = (
+        db.query(Contact).filter(Contact.id.in_(customer_ids)).all()
+        if customer_ids
+        else []
+    )
+    customers_by_id = {row.id: row for row in customers}
+    customer = customers_by_id.get(document.customer_id)
+    paid_by_invoice = {}
+    if document_type == "invoice" and documents:
+        payments = (
+            db.query(Payments)
+            .filter(
+                Payments.invoice_id.in_([row.id for row in documents]),
+                Payments.status == "completed",
+            )
+            .all()
+        )
+        for payment in payments:
+            paid_by_invoice[payment.invoice_id] = (
+                paid_by_invoice.get(payment.invoice_id, Decimal("0"))
+                + decimal_value(payment.amount, "customer payment")
+            )
+
+    preview_items = []
+    for row in documents:
+        total = decimal_value(row.total_price, "document total")
+        amount = (
+            max(total - paid_by_invoice.get(row.id, Decimal("0")), Decimal("0"))
+            if document_type == "invoice"
+            else total
+        )
+        row_customer = customers_by_id.get(row.customer_id)
+        reference = _metadata_value(row.document_number) or f"{document_type.title()} #{row.id}"
+        issue_date = _document_issue_date(row)
+        detail = f"{reference} - {issue_date}" if issue_date else reference
+        preview_items.append({
+            "href": f"/{document_type}s/{row.id}/print",
+            "title": row_customer.name if row_customer else "Customer",
+            "detail": detail,
+            "amount_text": _document_amount_text(
+                row.currency or CURRENCY_CODE,
+                amount,
+                "Due" if document_type == "invoice" else "Total",
+            ),
+            "status": row.status or "",
+            "active": row.id == document.id,
+        })
+
     try:
         lines = json.loads(document.items or "[]")
     except json.JSONDecodeError:
@@ -210,7 +285,17 @@ def _render_document(request, user, db, model, document_id, document_type):
         "user": user,
         "document": document,
         "document_type": document_type,
+        "display_document_number": (
+            _metadata_value(document.document_number)
+            or f"{document_type.title()} #{document.id}"
+        ),
+        "display_issue_date": _document_issue_date(document),
+        "display_deadline": _metadata_value(
+            document.due_date if document_type == "invoice" else document.expiry_date
+        ),
         "customer": customer,
+        "preview_list_title": "Invoices" if document_type == "invoice" else "Quotes",
+        "preview_items": preview_items,
         "lines": lines,
         "subtotal": subtotal,
         "tax_amount": tax_amount,

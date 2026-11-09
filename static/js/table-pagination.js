@@ -20,7 +20,7 @@
       </label>
       <p class="table-pagination-summary"></p>
       <div class="table-pagination-controls">
-        <button type="button" data-table-page="previous">Previous</button>
+        <button type="button" data-table-page="previous">Prev</button>
         <button type="button" data-table-page="next">Next</button>
       </div>`;
     (table.closest(".table-scroll-container") || table).insertAdjacentElement("afterend", container);

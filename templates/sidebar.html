@@ -1,4 +1,4 @@
-      <aside class="col-xs-12 col-md-2">
+      <aside class="col-xs-12 col-md-2 no-print">
         <nav>
           <ul>
             <li><a href="/dashboard">Home</a></li>
@@ -49,9 +49,6 @@
                 </ul>
               </details>
             </li>
-            <li><a href="/sales/receipts"{% if request.path == "/sales/receipts" %} aria-current="page"{% endif %}>Receipts</a></li>
-            <li><a href="/sales/payments"{% if request.path == "/sales/payments" %} aria-current="page"{% endif %}>Payments</a></li>
-            
             {% if user.role in ["admin", "manager"] %}
             <li><a href="/quotations">Quotes</a></li>
             <li><a href="/invoices">Invoices</a></li>

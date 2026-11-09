@@ -6,7 +6,7 @@
     <main class="contcts col-xs-12 col-md-9">
     <h1 id="document-page-title"></h1>
     <details>
-      <summary>Create {{ document_type }}</summary>
+      <summary>Add +</summary>
       <form id="document-form" data-document-type="{{ document_type }}">
         <div class="grid">
           <label>Customer<select name="customer_id" required><option value="">Select customer</option>{% for customer in customers %}<option value="{{ customer.id }}">{{ customer.name }}</option>{% endfor %}</select></label>
@@ -49,7 +49,7 @@
         {% for document in documents %}
         <tr>
           <td>{{ document.document_number or '#' ~ document.id }}</td>
-          <td>Customer #{{ document.customer_id }}</td>
+          <td>{{ customer_names.get(document.customer_id, "Unknown customer") }}</td>
           <td>{{ document.issue_date or document.created_at }}</td>
           <td>{{ document.status|replace("_", " ")|title }}</td>
           <td>{{ document.total_price|money }}</td>

@@ -2,65 +2,87 @@
 <style>
   @page { size: A4 portrait; margin: 12mm; }
   @media print {
-    .no-print { display: none !important; }
-    main.statement { width: 210mm; max-width: none; padding: 0; }
+    .no-print, .content-container > aside { display: none !important; }
+    .content-container { display: block; margin: 0; padding: 0; }
+    .content-container > main { display: block; max-width: none; padding: 0; width: 100%; }
+    .statement-A4-preview { flex: none; width: 210mm; max-width: none; padding: 4rem; }
+    .A4-document-letterhead {
+      display: flex;
+    }
   }
-  main.statement { max-width: 210mm; }
-  .statement-header { display: flex; justify-content: space-between; align-items: flex-start; }
-  .statement-header img { width: 190px; }
   .statement-table { font-size: 0.85rem; }
   .statement-table th, .statement-table td { vertical-align: top; }
   .amount { text-align: right; white-space: nowrap; }
 </style>
 <body>
-  <main class="container statement">
-    <nav class="no-print">
-      <ul><li><strong>Supplier statement</strong></li></ul>
-      <ul>
-        <li><a href="/suppliers">Supplier contacts</a></li>
-        <li><button type="button" onclick="window.print()">Print</button></li>
-      </ul>
-    </nav>
-    <div class="statement-header">
-      <img src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="We are Wines">
-      <div>
-        <h1>Statement of Transactions</h1>
-        <p>Statement date: {{ statement_date.strftime("%d/%m/%Y %H:%M") }}</p>
+  {% include "navbar.html" %}
+  <div class="content-container row">
+    {% include "sidebar.html" %}
+    <main class="col-xs-12 col-md-9 row">
+      <div class="col-xs-12 col-md-3 no-print">
+        {% include "preview_list.html" %}
       </div>
-    </div>
-    <section>
-      <h2>{{ supplier.name }}</h2>
-      {% if supplier.email %}<p>{{ supplier.email }}</p>{% endif %}
-      {% if supplier.phone %}<p>{{ supplier.phone }}</p>{% endif %}
-      {% if supplier.address %}<p>{{ supplier.address }}</p>{% endif %}
-    </section>
-    <table class="striped statement-table" data-no-pagination data-no-table-scroll>
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Reference</th>
-          <th>Transaction</th>
-          <th class="amount">Debit</th>
-          <th class="amount">Credit</th>
-          <th class="amount">Balance</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for transaction in transactions %}
-        <tr>
-          <td>{{ transaction.date }}</td>
-          <td>{{ transaction.reference }}</td>
-          <td><strong>{{ transaction.description }}</strong>{% if transaction.details %}<br>{{ transaction.details }}{% endif %}</td>
-          <td class="amount">{% if transaction.debit > 0 %}{{ transaction.debit|money }}{% else %}-{% endif %}</td>
-          <td class="amount">{% if transaction.credit > 0 %}{{ transaction.credit|money }}{% else %}-{% endif %}</td>
-          <td class="amount">{{ transaction.balance|money }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6">No transactions found.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    <p class="amount"><strong>Balance due: {{ balance_due|money }}</strong></p>
-  </main>
+      <article class="statement-A4-preview col-xs-12 col-md-9">
+        <nav class="no-print">
+          <ul></ul>
+          <ul>
+            <li><a role="button" class="secondary" href="/reports/export/xlsx?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Excel</a></li>
+            <li><a role="button" class="secondary" href="/reports/export/pdf?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">PDF</a></li>
+            <li><a role="button" class="secondary" href="/reports/export/csv?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">CSV</a></li>
+            <li><button type="button" onclick="window.print()">Print</button></li>
+          </ul>
+        </nav>
+        <div  class="A4-document-letterhead">
+          <div class="letterhead-logo">
+            <img src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="We are Wines Logo">
+          </div>
+          <div class="letterhead-contact-info" >
+            <h3>Area 47, Sector 4. Lilongwe. Malawi.</h3>
+            <p>info@wearewines.com</p>
+            <p>+265 (0) 999 123 456</p>
+            <p>+265 (0) 999 123 456</p>
+          </div>
+        </div>
+        <div class="A4-contact-details-metadata">
+          <h1>{{ supplier.name }}</h1>
+          {% if supplier.name %}
+            <p>{{ supplier.address }}</p>
+            <p>{{ supplier.email }}</p>
+            <p>{{ supplier.phone }}</p>
+          {% endif %}
+        </div>
+        <p class="statement-date"><strong>Date:</strong> {{ statement_date.strftime("%d/%m/%Y %H:%M") }}</p>
+        <table class="striped statement-table" data-no-pagination data-no-table-scroll>
+          <h2 style="text-align: center; margin-bottom: 2rem;">Statement of Transactions</h2>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Reference</th>
+              <th>Transaction</th>
+              <th class="amount">Debit</th>
+              <th class="amount">Credit</th>
+              <th class="amount">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for transaction in transactions %}
+            <tr>
+              <td>{{ transaction.date }}</td>
+              <td>{{ transaction.reference }}</td>
+              <td><strong>{{ transaction.description }}</strong>{% if transaction.details %}<br>{{ transaction.details }}{% endif %}</td>
+              <td class="amount">{% if transaction.debit > 0 %}{{ transaction.debit|money }}{% else %}-{% endif %}</td>
+              <td class="amount">{% if transaction.credit > 0 %}{{ transaction.credit|money }}{% else %}-{% endif %}</td>
+              <td class="amount">{{ transaction.balance|money }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6">No transactions found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <p class="amount"><strong>Balance due: {{ balance_due|money }}</strong></p>
+      </article>
+    </main>
+  </div>
+  <script src="{{ url_for('static', path='js/contacts.js') }}"></script>
 </body>
 </html>

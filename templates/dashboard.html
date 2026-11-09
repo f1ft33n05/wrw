@@ -49,7 +49,6 @@
     </div>
     {% include "footer.html" %}
     <script id="sales-chart-data" type="application/json">{{ sales_chart | safe }}</script>
-    <script src="{{ url_for('static', path='js/dashboard.js') }}"></script>
     <style>
       .dashboard-content { padding-bottom: 2rem; }
       .dashboard-heading { align-items: flex-start; display:flex; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
@@ -74,5 +73,6 @@
         #sales-chart { height:280px; }
       }
     </style>
+    <script src="{{ url_for('static', path='js/dashboard.js') }}"></script>
 </body>
 </html>
