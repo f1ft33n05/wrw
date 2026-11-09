@@ -317,6 +317,17 @@ tbody {
     font-size: 1.8rem;
 }
 
+.login-error {
+    border-radius: 0.5rem;
+    color: var(--pico-form-element-invalid-border-color);
+    margin: 1.5rem 0 0;
+    padding: 1rem 1.25rem;
+}
+
+.login-error + button {
+    margin-top: 1.5rem;
+}
+
 .footer-container {
     display: flex;
     justify-content: center;

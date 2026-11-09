@@ -8,6 +8,14 @@
         <label for="password">Password:</label>
         <input type="password" id="password" name="password" required autocomplete="false">
 
+        {% if error_message %}
+        <p class="login-error" role="alert">
+          {{ error_message }}
+          {% if retry_after_seconds %}
+          <strong id="login-retry-countdown" data-seconds="{{ retry_after_seconds }}"></strong>
+          {% endif %}
+        </p>
+        {% endif %}
         <button type="submit">Log In</button>
       </form>
       <div class="spacer col-md-2"></div>
@@ -16,5 +24,30 @@
       </div>
     </div>
     {%include "footer.html" %}
+    {% if error_message %}
+    <script>
+      const countdown = document.querySelector("#login-retry-countdown");
+      if (countdown) {
+        let seconds = Number(countdown.dataset.seconds);
+        const updateCountdown = () => {
+          const minutes = Math.floor(seconds / 60);
+          const remainingSeconds = seconds % 60;
+          countdown.textContent = ` ${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+          if (seconds > 0) {
+            seconds -= 1;
+            window.setTimeout(updateCountdown, 1000);
+          } else {
+            document.querySelector(".login-error").textContent =
+              "You can try logging in again now.";
+          }
+        };
+        updateCountdown();
+      } else {
+        window.setTimeout(() => {
+          document.querySelector(".login-error")?.remove();
+        }, 3000);
+      }
+    </script>
+    {% endif %}
 </body>
 </html>

@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta, timezone
+from math import ceil
 import time
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.templating import Jinja2Templates
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from database_models import User, RolePermission
@@ -20,21 +22,41 @@ router = APIRouter(
     prefix="/auth",
     tags=["auth"]
 )
+templates = Jinja2Templates(directory="templates")
 
 bcrypt_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token', auto_error=False)
 
 login_attempts: dict[str, list[float]] = {}
+LOGIN_RATE_LIMIT_WINDOW_SECONDS = 5 * 60
 
 
 def _check_login_rate_limit(request: Request) -> None:
     key = request.client.host if request.client else "unknown"
     now = time.monotonic()
-    recent = [timestamp for timestamp in login_attempts.get(key, []) if now - timestamp < 900]
+    recent = [
+        timestamp
+        for timestamp in login_attempts.get(key, [])
+        if now - timestamp < LOGIN_RATE_LIMIT_WINDOW_SECONDS
+    ]
+    login_attempts[key] = recent
     if len(recent) >= 5:
-        raise HTTPException(status_code=429, detail="Too many login attempts. Try again later.")
-    recent.append(now)
+        retry_after = max(
+            1,
+            ceil(LOGIN_RATE_LIMIT_WINDOW_SECONDS - (now - recent[0])),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please try again in",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+def _record_failed_login(request: Request) -> None:
+    key = request.client.host if request.client else "unknown"
+    recent = login_attempts.get(key, [])
+    recent.append(time.monotonic())
     login_attempts[key] = recent
 
 
@@ -58,15 +80,31 @@ async def login(
     db: db_dependency,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ):
-    _check_login_rate_limit(request)
+    try:
+        _check_login_rate_limit(request)
+    except HTTPException as exc:
+        if exc.status_code != status.HTTP_429_TOO_MANY_REQUESTS:
+            raise
+        return templates.TemplateResponse(
+            request,
+            "auth.html",
+            {
+                "error_message": exc.detail,
+                "retry_after_seconds": int(exc.headers["Retry-After"]),
+            },
+            status_code=exc.status_code,
+        )
+
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
+        _record_failed_login(request)
         record_audit_event(db, action="auth.login", outcome="failure", ip_address=request.client.host if request.client else None)
         db.commit()
-        raise HTTPException(
+        return templates.TemplateResponse(
+            request,
+            "auth.html",
+            {"error_message": "Incorrect username or password"},
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
         )
 
     token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
