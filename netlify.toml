@@ -1,7 +1,11 @@
 [build]
+  command = "pip install -r requirements.txt"
   functions = "netlify/functions"
 
 [[redirects]]
   from = "/*"
   to = "/.netlify/functions/api/:splat"
   status = 200
+
+[functions]
+  included_files = ["**/*.py"] # Dynamically includes your Python files
