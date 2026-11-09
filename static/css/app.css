@@ -1138,3 +1138,340 @@ aside details ul {
 #profile-edit-form legend {
     font-weight: bold;
 }
+
+body {
+    max-height: none;
+    min-height: 100vh;
+}
+
+@media (max-width: 1440px) {
+    .content-container {
+        padding: 1.5rem;
+    }
+
+    .content-container > main,
+    .items-page {
+        padding-left: 1.5rem;
+    }
+
+    .dashboard-greeting h1 {
+        font-size: 2.6rem;
+    }
+
+    .metric-card .metric-label {
+        font-size: 1.4rem;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
+    .content-container {
+        padding: 1.2rem;
+    }
+
+    .content-container > main,
+    .items-page {
+        padding-left: 1rem;
+        min-width: 0;
+    }
+
+    .content-container > aside {
+        min-width: 15rem;
+    }
+
+    .dashboard-content .dashboard-heading {
+        flex-wrap: wrap;
+    }
+
+    .dashboard-content .dashboard-date-filter {
+        flex-wrap: wrap;
+    }
+
+    .reseller-select-form,
+    #reseller-payment-form,
+    #purchase-form .supplier-select,
+    .receive-purchase,
+    .report-filters {
+        width: 100%;
+    }
+
+    .allocation-cart summary,
+    .reconciliation-form summary,
+    .reseller-stock-mvmt summary,
+    .rec-pay-main-summ,
+    #reconciliation-form input,
+    #reconciliation-form button,
+    #reseller-payment-form button {
+        width: 100%;
+    }
+}
+
+@media (max-width: 767px) {
+    html {
+        font-size: 58%;
+    }
+
+    header {
+        height: 7rem;
+    }
+
+    header nav {
+        width: 100%;
+        padding: 0 1.5rem;
+    }
+
+    .logo img {
+        height: 4rem;
+    }
+
+    #user-avatar img {
+        width: 4rem;
+    }
+
+    .content-container,
+    .dashboard-container {
+        display: block;
+        padding: 1rem;
+    }
+
+    .content-container > aside {
+        max-width: 100%;
+        padding: 0 1rem;
+        width: 100%;
+    }
+
+    .content-container > aside > nav > ul {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem 1rem;
+        padding: 0;
+    }
+
+    .content-container > aside > nav > ul > li {
+        margin: 0;
+    }
+
+    .content-container > main,
+    .items-page {
+        max-width: 100%;
+        min-width: 0;
+        padding: 1rem;
+        width: 100%;
+    }
+
+    .dashboard-content .dashboard-heading {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .dashboard-content .dashboard-date-filter {
+        align-items: stretch;
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .dashboard-date-filter label,
+    .dashboard-date-filter input,
+    .dashboard-date-filter button {
+        width: 100%;
+    }
+
+    .metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+    }
+
+    .metric-card {
+        min-width: 0;
+    }
+
+    .dashboard-chart-card {
+        margin-top: 1.5rem;
+        padding: 0.8rem;
+    }
+
+    .report-filters,
+    .reseller-select-form,
+    #reseller-payment-form,
+    #purchase-form .supplier-select,
+    .receive-purchase {
+        width: 100%;
+    }
+
+    .allocation-cart summary,
+    .reconciliation-form summary,
+    .reseller-stock-mvmt summary,
+    .rec-pay-main-summ,
+    #reconciliation-form input,
+    #reconciliation-form button,
+    #reseller-payment-form button {
+        width: 100%;
+    }
+
+    .preview-list {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .preview-list-items {
+        max-height: calc(100vh - 15rem);
+    }
+
+    .document-preview,
+    .statement-A4-preview {
+        margin-top: 1rem;
+        min-width: 0;
+        padding: 1.5rem;
+    }
+
+    .client-document-metadata {
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .document-meta {
+        text-align: left;
+    }
+
+    .document-lines,
+    .statement-table {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+    }
+
+    .report-actions,
+    .receipt-page-actions {
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .receipt-page-actions button,
+    .receipt-page-actions a {
+        padding: 0.5rem 1.5rem;
+    }
+
+    .pos-page,
+    .pos-layout {
+        height: auto;
+        overflow: visible;
+    }
+
+    .cart-operations {
+        flex-direction: column;
+        padding: 0.5rem;
+    }
+
+    .pos-cart-panel {
+        flex: none;
+        height: 50rem;
+        min-height: 0;
+    }
+
+    .products-selection,
+    .pos-products-panel {
+        height: 48rem;
+        min-height: 0;
+    }
+
+    .pos-product-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pos-actions,
+    .pos-pay-actions {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 1rem;
+        width: 100%;
+    }
+
+    .pos-pay-actions p,
+    .pos-pay-actions button {
+        margin: 0;
+        width: 100%;
+    }
+}
+
+@media (max-width: 767px) and (orientation: portrait) {
+    .authentication-content {
+        height: auto;
+        min-height: calc(100vh - 12rem);
+        padding: 2rem 0;
+        width: 100%;
+    }
+
+    .metric-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .pos-cart-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .pos-cart-toolbar input,
+    .pos-cart-toolbar select {
+        width: 100%;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: portrait) {
+    .content-container {
+        padding: 1rem;
+    }
+
+    .content-container > main,
+    .items-page {
+        min-width: 0;
+        padding-left: 1rem;
+    }
+
+    .content-container > aside {
+        min-width: 13rem;
+    }
+
+    .dashboard-content .dashboard-heading {
+        flex-wrap: wrap;
+    }
+
+    .dashboard-content .dashboard-date-filter {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .dashboard-content .metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pos-page,
+    .pos-layout {
+        height: auto;
+        overflow: visible;
+    }
+
+    .cart-operations {
+        flex-direction: column;
+    }
+
+    .pos-cart-panel {
+        flex: none;
+        height: 48rem;
+    }
+
+    .products-selection,
+    .pos-products-panel {
+        height: 50rem;
+    }
+
+    .pos-product-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .report-filters,
+    .reseller-select-form,
+    #reseller-payment-form,
+    #purchase-form .supplier-select,
+    .receive-purchase {
+        width: 100%;
+    }
+}
