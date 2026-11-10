@@ -27,11 +27,7 @@
         <div class="receipt-metadata">
           <h3>Receipt #: {{ invoice.id }}</h3>
           <h3>Date: {{ invoice_created_at }}</h3>
-          {% if payments %}
-            {% for payment in payments %}
-            <h3>Cashier: {{ payment.collector }}</h3>
-            {% endfor %}
-          {% endif %}
+          {% if cashier %}<h3>Cashier: {{ cashier }}</h3>{% endif %}
           <h3>Customer: {{ customer.name if customer else "Walk-in customer" }}{% if customer and customer.phone %} - {{ customer.phone }}{% endif %}</h3>
           {% if event %}
             <h3>Event: {{ event.name }}{% if event.venue %}{% endif %}</h3>

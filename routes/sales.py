@@ -616,6 +616,7 @@ async def create_sale(
         invoice = Invoices(
             customer_id=checkout.customer_id,
             event_id=checkout.event_id,
+            created_by=current_user["id"],
             items=json.dumps(invoice_lines),
             total_price=str(total),
             status="draft" if checkout.save_draft else _invoice_status(total, amount_paid),
@@ -840,13 +841,11 @@ async def receipt(
         .order_by(Payments.id)
         .all()
     )
-    collector_ids = {payment.collected_by for payment in payments if payment.collected_by}
-    collectors = (
-        db.query(User).filter(User.id.in_(collector_ids)).all()
-        if collector_ids
-        else []
+    cashier_id = invoice.created_by or next(
+        (payment.collected_by for payment in payments if payment.collected_by),
+        None,
     )
-    collector_by_id = {collector.id: collector for collector in collectors}
+    cashier = db.query(User).filter(User.id == cashier_id).first() if cashier_id else None
     customer = (
         db.query(Contact).filter(Contact.id == invoice.customer_id).first()
         if invoice.customer_id is not None
@@ -908,6 +907,7 @@ async def receipt(
             "invoice_created_at": _display_timestamp(invoice.created_at),
             "customer": customer,
             "event": event,
+            "cashier": cashier.name if cashier else None,
             "lines": lines,
             "payments": [
                 {
@@ -915,11 +915,6 @@ async def receipt(
                     "payment_method": payment.payment_method,
                     "amount": payment.amount,
                     "change_amount": payment.change_amount or "0.00",
-                    "collector": (
-                        collector_by_id[payment.collected_by].name
-                        if payment.collected_by in collector_by_id
-                        else None
-                    ),
                 }
                 for payment in payments
             ],

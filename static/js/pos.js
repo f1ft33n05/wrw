@@ -396,7 +396,7 @@ function addMultiplePaymentRow(amount = "") {
             <option value="bank transfer">Bank transfer</option>
         </select>
         <input name="amount" type="number" min="0.01" step="0.01" value="${amount}" required>
-        <button type="button" class="remove-payment-row">Remove</button>
+        <button type="button" class="remove-payment-row pico-background-red-700">Remove</button>
     `;
     row.querySelector(".remove-payment-row").addEventListener("click", () => {
         row.remove();

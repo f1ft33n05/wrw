@@ -15,6 +15,7 @@ from database_models import (
     ItemCategory,
     ItemDiscount,
     PurchaseLines,
+    Purchases,
     PurchaseTxns,
     ResellerAllocationLines,
     ResellerTxns,

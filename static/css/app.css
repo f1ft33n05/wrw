@@ -3,7 +3,7 @@ html {
 }
 
 body {
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     max-height: 100vh;
 }
 
@@ -20,7 +20,7 @@ h1 {
 
 input, select {
     font-size: 1.6rem;
-    height: 4rem;
+    height: 3.5rem;
 }
 
 .all-users-container button {
@@ -72,7 +72,7 @@ tbody {
 }
 
 .logo img {
-    height: 4rem;
+    height: 3.5rem;
 }
 
 .content-container {
@@ -144,7 +144,7 @@ tbody {
 }
 
 .pos-actions {
-    padding: 1rem;
+    padding: 0.5rem;
     display: flex;
     justify-content: space-between;
 }
@@ -178,7 +178,7 @@ tbody {
 
 
 .pos-cart-toolbar input, .pos-cart-toolbar select, .pos-cart-panel input, .pos-cart-panel select {
-    height: 4rem;
+    height: 3.5rem;
     margin: 0;
     font-size: 1.5rem;
 }
@@ -261,8 +261,8 @@ tbody {
 
 
 .pos-actions button {
-    height: 5rem;
-    font-size: 1.6rem;
+    height: 3.5rem;
+    font-size: 1.4rem;
     padding: 1rem 2rem;
     border-radius: .5rem;
 }
@@ -273,16 +273,25 @@ tbody {
     width: 50%;
     display: flex;
     justify-content: end;
+    align-items: flex-end;
     gap: 1;
 }
 
 .pos-pay-actions p {
-    width: 40%;
+    width: 60%;
  }
 .pos-pay-actions button {
     width: fit-content;
-    padding: 0 2rem;
     margin-left: 2rem;
+ }
+
+ .pos-action-buttons {
+    display: flex;
+    align-items: flex-end;
+ }
+
+ .pos-action-buttons button {
+    margin-right: 2rem;
  }
 
 
@@ -309,13 +318,13 @@ tbody {
     height: 5rem;
     padding: 1rem;
     margin-bottom: 0;
-    font-size: 1.8rem;
+    font-size: 1.6rem;
 }
 
 .authentication-content button {
     padding: 1rem 0.5rem;
     margin-top: 3rem;
-    font-size: 1.8rem;
+    font-size: 1.6rem;
 }
 
 .login-error {
@@ -333,7 +342,7 @@ tbody {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 4rem;
+    height: 3.5rem;
     padding: 2rem;
     margin-top: 2rem;
 }
@@ -379,7 +388,7 @@ tbody {
 }
 
 .dashboard-date-filter input, .dashboard-date-filter button {
-    height: 4rem;
+    height: 3.5rem;
     padding: 0.5rem;
     margin-top: 1rem;
     font-size: 1.6rem;
@@ -431,7 +440,7 @@ tbody {
 }
 
 #user-edit-form input {
-    height: 4rem;
+    height: 3.5rem;
 }
 
 #user-delete-dialog footer {
@@ -492,10 +501,18 @@ tbody {
 
 #contact-create-form input {
     font-size: 1.6rem;
-    height: 4rem;
+    height: 3.5rem;
 }
 
 /* ITEMS */
+#item-details-view-dialog article {
+    width: 80% !important;
+}
+
+.items-import-page {
+    margin-left: 2rem;
+}
+
 .items-import-page h1, .items-page h1 {
     font-size: 2.4rem;
     margin-bottom: 2rem;
@@ -611,6 +628,30 @@ tbody {
     padding: 1rem;
 }
 
+#multiple-payment-form h3 {
+    font-size: 2.6rem;
+    margin-bottom: 2rem;
+}
+
+#multiple-payment-form input {
+    height: 3.5rem;
+}
+
+#multiple-payment-form button {
+    font-size: 1.3rem;
+}
+
+#multiple-payment-form menu {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+}
+
+#multiple-payment-form menu button{
+    margin-left: 2rem;
+    border: none;
+}
+
 .all-sales-container #pos-form {
     margin-top: 2rem;
 }
@@ -619,7 +660,7 @@ tbody {
 }
 
 .all-sales-container #pos-form input {
-    height: 4rem;
+    height: 3.5rem;
 }
 
 .all-sales-container #pos-form button {
@@ -632,7 +673,7 @@ tbody {
 }
 
 .all-sales-container tbody tr td {
-    font-size: 1.6rem;
+    font-size: 1.4rem;
 
 }
 
@@ -729,7 +770,7 @@ tbody {
     border-color: var(--pico-secondary);
 }
 
-.event-card strong { font-size: 1.8rem; }
+.event-card strong { font-size: 1.6rem; }
 .event-card span, .event-card small {
     font-size: 1.4rem;
 }
@@ -760,6 +801,7 @@ tbody {
 .app-confirm-dialog-message {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+    font-size: 1.6rem;
 }
 
 .app-confirm-dialog-actions {
@@ -772,11 +814,12 @@ tbody {
 .app-confirm-dialog-actions button {
     width: auto;
     margin: 0;
+    border: none;
+    font-size: 1.3rem;
 }
 
 .app-confirm-dialog-danger {
-    background: var(--pico-del-color);
-    border-color: var(--pico-del-color);
+    background: #861d13;
 }
 
 .app-confirm-dialog::backdrop {
@@ -792,22 +835,29 @@ tbody {
 }
 
 .event-detail-dialog h2 {
-    font-size: 3rem;
+    font-size: 2.6rem;
+    margin-bottom: 3rem;
+}
+
+.event-detail-dialog h2 {
+    font-size: 2.6rem;
     margin-bottom: 3rem;
 }
 
 #close-event-dialog {
     position: absolute;
-    top: 1rem;
-    right: 1rem;
-    width: 4rem;
-    height: 4rem;
+    top: 2rem;
+    right: 2rem;
+    width: 3rem;
+    height: 3.5rem;
     margin: auto;
-    font-size: 2rem;
+    font-size: 1.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
+    background-color: #861d13;
+    border: none;
 }
 
 .event-countdown {
@@ -880,7 +930,7 @@ tbody {
 
 .allocation-cart input, .allocation-cart select {
     font-size: 1.6rem;
-    height: 4rem;
+    height: 3.5rem;
 }
 
 .allocation-cart button, .reconciliation-form button,#reseller-payment-form button, #add-purchase-line {
@@ -898,7 +948,7 @@ tbody {
 }
 
 #reconciliation-form input, #reseller-payment-form input, #reseller-payment-form select {
-    height: 4rem;
+    height: 3.5rem;
     font-size: 1.6rem;
     margin-top: 1rem;
     width: 50%;
@@ -1002,7 +1052,7 @@ tbody {
 }
 #purchase-form input{
     font-size: 1.6rem;
-    height: 4rem;
+    height: 3.5rem;
 }
 
 #purchase-form .supplier-select {
@@ -1183,7 +1233,7 @@ aside details ul {
 }
 
 .table-pagination select {
-    height: 3rem;
+    height: 3.5rem;
     font-size: 1.3rem;
     padding: 0 1rem;
 }
@@ -1207,7 +1257,7 @@ aside details ul {
 
 .report-filters input {
     margin-top: 1rem;
-    height: 4rem;
+    height: 3.5rem;
 }
 
 .report-filters label {
@@ -1246,7 +1296,7 @@ aside details ul {
 }
 
 #profile-edit-form input {
-    height: 4rem;
+    height: 3.5rem;
 }
 
 #profile-edit-form button {
@@ -1344,7 +1394,7 @@ body {
     }
 
     .logo img {
-        height: 4rem;
+        height: 3.5rem;
     }
 
     #user-avatar img {
