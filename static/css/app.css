@@ -40,8 +40,9 @@ details.dropdown>summary+ul {
     width: 15rem;
 }
 
-tbody {
+tbody td{
     font-size: 1.4rem;
+    height: auto;
 }
 
 /* Hide scrollbar for all major modern and legacy browsers */
@@ -466,11 +467,11 @@ tbody {
 
 /* CONTACTS */
 .contcts details {
-    margin-bottom: 3rem;
+    margin-bottom: rem;
 }
 .contcts h1 {
     font-size: 2.4rem;
-    margin-bottom: 4rem;
+    margin-bottom: 2rem;
 }
 .contcts summary {
     width: fit-content;
@@ -538,6 +539,7 @@ tbody {
 
 .all-items-list td{
     font-size: 1.3rem;
+    padding: 0;
 }
 
 .all-items-list button {
