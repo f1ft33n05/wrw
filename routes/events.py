@@ -7,7 +7,16 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from database import db_dependency
-from database_models import EventStockAllocation, Events, Invoices, Item, Payments
+from database_models import (
+    EventStockAllocation,
+    Events,
+    Invoices,
+    Item,
+    Payments,
+    Quotations,
+    SalesTxn,
+    StockMvt,
+)
 from models import EventRequest, EventStockAllocationRequest, Role
 from routes.auth import RoleChecker, get_current_user
 from routes.ledger_utils import decimal_value, format_money
@@ -22,15 +31,73 @@ EVENT_ACCESS = Depends(RoleChecker(Role.admin, Role.manager))
 EVENT_VIEW_ACCESS = Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))
 
 
+def _release_event_stock(db, event_id: int, timestamp: str, source: str):
+    allocations = (
+        db.query(EventStockAllocation)
+        .filter(EventStockAllocation.event_id == event_id)
+        .with_for_update()
+        .all()
+    )
+    remaining_stock = []
+    for allocation in allocations:
+        remaining = decimal_value(allocation.quantity_remaining, "remaining event stock")
+        if remaining <= 0:
+            continue
+        item = db.query(Item).filter(Item.id == allocation.item_id).with_for_update().first()
+        if item is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Allocated item {allocation.item_id} no longer exists; event cannot be {source}",
+            )
+        remaining_stock.append((allocation, item, remaining))
+
+    for allocation, item, remaining in remaining_stock:
+        item.quantity = str(decimal_value(item.quantity or "0", "item quantity") + remaining)
+        item.updated_at = timestamp
+        allocation.quantity_remaining = "0"
+        allocation.status = "returned"
+        allocation.updated_at = timestamp
+        db.add(
+            StockMvt(
+                item_id=item.id,
+                quantity=str(remaining),
+                movement_type="in",
+                note=f"Returned from {source} Event ({event_id})",
+                created_at=timestamp,
+                updated_at=timestamp,
+            )
+        )
+    return allocations
+
+
 @router.get("/events", response_class=HTMLResponse, dependencies=[EVENT_VIEW_ACCESS])
 async def events_page(request: Request, user: user_dependency, db: db_dependency):
     return_expired_event_stock(db)
     events = db.query(Events).order_by(Events.starts_at.desc(), Events.name).all()
     items = db.query(Item).order_by(Item.name).all()
+    events_with_sales = {
+        row[0]
+        for row in db.query(SalesTxn.event_id)
+        .filter(SalesTxn.event_id.isnot(None))
+        .distinct()
+        .all()
+    }
+    events_with_sales.update(
+        row[0]
+        for row in db.query(Invoices.event_id)
+        .filter(Invoices.event_id.isnot(None))
+        .distinct()
+        .all()
+    )
     return templates.TemplateResponse(
         request,
         "events.html",
-        {"user": user, "events": events, "stock_items": items},
+        {
+            "user": user,
+            "events": events,
+            "events_with_sales": events_with_sales,
+            "stock_items": items,
+        },
     )
 
 
@@ -54,6 +121,46 @@ async def create_event(payload: EventRequest, user: user_dependency, db: db_depe
     return {"message": "Event created", "event_id": event.id}
 
 
+@router.delete("/events/{event_id}", dependencies=[EVENT_ACCESS])
+async def delete_event(event_id: int, db: db_dependency):
+    event = db.query(Events).filter(Events.id == event_id).with_for_update().first()
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if (
+        db.query(SalesTxn.id).filter(SalesTxn.event_id == event_id).first()
+        or db.query(Invoices.id).filter(Invoices.event_id == event_id).first()
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Events linked to sales cannot be deleted; archive the event instead",
+        )
+
+    timestamp = datetime.now(timezone.utc).isoformat()
+    allocations = _release_event_stock(db, event_id, timestamp, "deleted")
+    db.query(Quotations).filter(Quotations.event_id == event_id).update(
+        {Quotations.event_id: None, Quotations.updated_at: timestamp},
+        synchronize_session=False,
+    )
+    for allocation in allocations:
+        db.delete(allocation)
+    db.delete(event)
+    db.commit()
+    return {"message": "Event deleted"}
+
+
+@router.patch("/events/{event_id}/archive", dependencies=[EVENT_ACCESS])
+async def archive_event(event_id: int, db: db_dependency):
+    event = db.query(Events).filter(Events.id == event_id).with_for_update().first()
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    timestamp = datetime.now(timezone.utc).isoformat()
+    _release_event_stock(db, event_id, timestamp, "archived")
+    event.status = "archived"
+    event.updated_at = timestamp
+    db.commit()
+    return {"message": "Event archived"}
+
+
 @router.post("/events/{event_id}/stock", dependencies=[EVENT_ACCESS])
 async def allocate_event_stock(
     event_id: int,
@@ -61,10 +168,10 @@ async def allocate_event_stock(
     user: user_dependency,
     db: db_dependency,
 ):
-    event = db.query(Events).filter(Events.id == event_id).first()
+    event = db.query(Events).filter(Events.id == event_id).with_for_update().first()
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
-    if event.status in {"closed", "cancelled"}:
+    if event.status in {"closed", "cancelled", "archived"}:
         raise HTTPException(status_code=409, detail="Stock cannot be assigned to a closed event")
     ends_at = parse_event_timestamp(event.ends_at or event.starts_at)
     if ends_at is not None and ends_at < datetime.now(timezone.utc):

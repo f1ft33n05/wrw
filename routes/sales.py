@@ -451,7 +451,7 @@ async def create_sale(
         return JSONResponse(status_code=cached[0], content=cached[1])
     event = None
     if checkout.event_id is not None:
-        event = db.query(Events).filter(Events.id == checkout.event_id).first()
+        event = db.query(Events).filter(Events.id == checkout.event_id).with_for_update().first()
         if event is None:
             raise HTTPException(status_code=404, detail="Event not found")
         if event.status not in {"planned", "active"}:

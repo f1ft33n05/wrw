@@ -40,6 +40,8 @@ function updateCountdown(startValue, endValue) {
     const countdown = document.querySelector("#event-countdown-value");
     const label = document.querySelector("#event-countdown-label");
     const openPos = document.querySelector("#event-open-pos");
+    const eventUnavailable = ["closed", "cancelled", "archived"]
+        .includes(window.eventCardBeingOpened?.dataset.status);
     if (!target) {
         countdown.textContent = "Date not set";
         label.textContent = "";
@@ -63,7 +65,7 @@ function updateCountdown(startValue, endValue) {
     } else if (isEventToday(startValue)) {
         countdown.textContent = "Event day";
         label.textContent = "Open POS is available today";
-        openPos.disabled = false;
+        openPos.disabled = eventUnavailable;
     } else {
         countdown.textContent = "Event passed";
         label.textContent = "";
@@ -74,9 +76,9 @@ function updateCountdown(startValue, endValue) {
 window.openEventDetails = function (card) {
         window.eventCardBeingOpened = card;
         const start = parseLocalDate(card.dataset.start);
-        const expired = ["closed", "cancelled"].includes(card.dataset.status)
+        const expired = ["closed", "cancelled", "archived"].includes(card.dataset.status)
             || isEventEnded(card.dataset.end, card.dataset.start);
-        if (expired && !["closed", "cancelled"].includes(card.dataset.status)) {
+        if (expired && !["closed", "cancelled", "archived"].includes(card.dataset.status)) {
             card.dataset.status = "closed";
             card.querySelector("em").textContent = "Closed";
         }
@@ -89,7 +91,7 @@ window.openEventDetails = function (card) {
             card.dataset.description || "No additional details.";
         document.querySelector("#event-view-sales").href = `/events/${card.dataset.id}`;
         const assignStock = document.querySelector("#assign-event-stock");
-        const isClosed = ["closed", "cancelled"].includes(card.dataset.status);
+        const isClosed = ["closed", "cancelled", "archived"].includes(card.dataset.status);
         assignStock.disabled = isClosed || expired;
         document.querySelector("#event-open-pos").disabled = isClosed || expired;
         document.querySelector("#event-open-pos").onclick = () => {
@@ -109,10 +111,70 @@ window.openEventDetails = function (card) {
 };
 
 document.querySelectorAll(".event-card").forEach((card) => {
-    if (!["closed", "cancelled"].includes(card.dataset.status) && isEventEnded(card.dataset.end, card.dataset.start)) {
+    if (!["closed", "cancelled", "archived"].includes(card.dataset.status) && isEventEnded(card.dataset.end, card.dataset.start)) {
         card.dataset.status = "closed";
         const status = card.querySelector("em");
         if (status) status.textContent = "Closed";
+    }
+});
+
+const eventGrid = document.querySelector("#events-grid");
+const eventFilterTabs = [...document.querySelectorAll("[data-event-filter]")];
+const noEventsInFilter = document.querySelector("#no-events-in-filter");
+
+function filterEvents(filter) {
+    let visibleCount = 0;
+    document.querySelectorAll(".event-card").forEach((card) => {
+        const status = card.dataset.status;
+        const matches = filter === "all"
+            || status === filter
+            || (filter === "canceled" && ["cancelled", "closed"].includes(status));
+        card.hidden = !matches;
+        if (matches) visibleCount += 1;
+    });
+    noEventsInFilter.hidden = visibleCount > 0;
+}
+
+eventFilterTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+        eventFilterTabs.forEach((filterTab) => {
+            filterTab.setAttribute("aria-pressed", String(filterTab === tab));
+        });
+        filterEvents(tab.dataset.eventFilter);
+    });
+});
+
+eventGrid?.addEventListener("click", async (event) => {
+    const actionButton = event.target.closest("[data-event-action]");
+    if (!actionButton) return;
+
+    const eventCard = actionButton.closest(".event-card");
+    const action = actionButton.dataset.eventAction;
+    const eventName = eventCard.dataset.name;
+    const confirmation = action === "delete"
+        ? `Delete "${eventName}"? This cannot be undone.`
+        : `Archive "${eventName}"?`;
+    if (!window.confirm(confirmation)) return;
+
+    const actionError = document.querySelector("#event-action-error");
+    actionError.textContent = "";
+    actionButton.disabled = true;
+    try {
+        const response = await fetch(
+            `/events/${encodeURIComponent(eventCard.dataset.id)}${action === "archive" ? "/archive" : ""}`,
+            {
+                method: action === "delete" ? "DELETE" : "PATCH",
+                credentials: "same-origin",
+            },
+        );
+        if (!response.ok) {
+            const body = await response.json().catch(() => ({}));
+            throw new Error(body.detail || `Could not ${action} event.`);
+        }
+        window.location.reload();
+    } catch (error) {
+        actionError.textContent = error.message;
+        actionButton.disabled = false;
     }
 });
 

@@ -19,7 +19,7 @@
               <label>Start date<input name="starts_at_date" type="date"></label>
               <label>Starts at<input name="starts_at_time" type="time"></label>
               <label>Ends at<input name="ends_at_time" type="time"></label>
-              <label>Status<select name="status"><option>planned</option><option>active</option><option>closed</option><option>cancelled</option></select></label>
+              <label>Status<select name="status"><option>planned</option><option>active</option><option>closed</option><option value="cancelled">canceled</option></select></label>
             </div>
             <label>End date<input name="ends_at_date" type="date"></label>
             <label>Description<textarea name="description"></textarea></label>
@@ -30,10 +30,17 @@
       </article>
       {% endif %}
 
-      <section class="events-grid">
+      <nav class="event-filter-tabs" aria-label="Filter events by status">
+        <button type="button" data-event-filter="all" aria-pressed="true">All</button>
+        <button type="button" data-event-filter="planned" aria-pressed="false">Planned</button>
+        <button type="button" data-event-filter="active" aria-pressed="false">Active</button>
+        <button type="button" data-event-filter="canceled" aria-pressed="false">Canceled</button>
+        <button type="button" data-event-filter="archived" aria-pressed="false">Archived</button>
+      </nav>
+      <p id="event-action-error" role="alert"></p>
+      <section class="events-grid" id="events-grid">
         {% for event in events %}
-        <button class="event-card" type="button"
-          onclick="openEventDetails(this)"
+        <article class="event-card"
           data-id="{{ event.id }}"
           data-name="{{ event.name }}"
           data-venue="{{ event.venue or '' }}"
@@ -42,15 +49,29 @@
           data-type="{{ event.event_type or '' }}"
           data-status="{{ event.status or 'planned' }}"
           data-description="{{ event.description or '' }}">
-          <strong>{{ event.name }}</strong>
-          <span>{{ event.starts_at or "Date not set" }}</span>
-          <small>{{ event.venue or "Location not set" }}</small>
-          <em>{{ event.status|title }}</em>
-        </button>
+          <button class="event-card-main" type="button" onclick="openEventDetails(this.closest('.event-card'))">
+            <strong>{{ event.name }}</strong>
+            <span>{{ event.starts_at or "Date not set" }}</span>
+            <small>{{ event.venue or "Location not set" }}</small>
+            <em>{{ event.status|replace("cancelled", "canceled")|title }}</em>
+          </button>
+          {% if user.role in ["admin", "manager"] %}
+          <div class="event-card-actions">
+            {% if event.id in events_with_sales and event.status != "archived" %}
+            <button type="button" class="event-card-action" data-event-action="archive"
+              aria-label="Archive {{ event.name }}" title="Archive event">Archive</button>
+            {% elif event.id not in events_with_sales %}
+            <button type="button" class="event-card-action event-card-delete" data-event-action="delete"
+              aria-label="Delete {{ event.name }}" title="Delete event">Delete</button>
+            {% endif %}
+          </div>
+          {% endif %}
+        </article>
         {% else %}
-        <p>No events found.</p>
+        <p id="no-events-found">No events found.</p>
         {% endfor %}
       </section>
+      <p id="no-events-in-filter" hidden>No events in this category.</p>
 
       <dialog id="event-detail-dialog" class="event-detail-dialog">
         <article>
@@ -95,6 +116,6 @@
       </dialog>
   </main>
   </div>
-  <script src="{{ url_for('static', path='js/events.js') }}?v=6"></script>
+  <script src="{{ url_for('static', path='js/events.js') }}?v=7"></script>
 </body>
 </html>
