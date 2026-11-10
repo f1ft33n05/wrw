@@ -20,7 +20,12 @@ from database_models import (
 from models import EventRequest, EventStockAllocationRequest, Role
 from routes.auth import RoleChecker, get_current_user
 from routes.ledger_utils import decimal_value, format_money
-from event_stock import parse_event_timestamp, return_expired_event_stock
+from event_stock import (
+    event_is_expired,
+    parse_event_end_timestamp,
+    parse_event_start_timestamp,
+    return_expired_event_stock,
+)
 
 
 router = APIRouter(tags=["events"])
@@ -102,7 +107,7 @@ async def events_page(request: Request, user: user_dependency, db: db_dependency
 
 
 @router.post("/events", dependencies=[EVENT_ACCESS])
-async def create_event(payload: EventRequest, user: user_dependency, db: db_dependency):
+async def create_event(payload: EventRequest, db: db_dependency):
     timestamp = datetime.now(timezone.utc).isoformat()
     event = Events(
         name=payload.name.strip(),
@@ -111,7 +116,7 @@ async def create_event(payload: EventRequest, user: user_dependency, db: db_depe
         ends_at=payload.ends_at or None,
         event_type=payload.event_type.strip() if payload.event_type else None,
         description=payload.description.strip() if payload.description else None,
-        status=payload.status if payload.status in {"planned", "active", "closed", "cancelled"} else "planned",
+        status="planned",
         created_at=timestamp,
         updated_at=timestamp,
     )
@@ -161,6 +166,42 @@ async def archive_event(event_id: int, db: db_dependency):
     return {"message": "Event archived"}
 
 
+@router.patch("/events/{event_id}/cancel", dependencies=[EVENT_ACCESS])
+async def cancel_event(event_id: int, db: db_dependency):
+    event = db.query(Events).filter(Events.id == event_id).with_for_update().first()
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.status in {"cancelled", "closed", "archived"}:
+        raise HTTPException(status_code=409, detail="This event cannot be canceled")
+    timestamp = datetime.now(timezone.utc).isoformat()
+    _release_event_stock(db, event_id, timestamp, "canceled")
+    event.status = "cancelled"
+    event.updated_at = timestamp
+    db.commit()
+    return {"message": "Event canceled"}
+
+
+@router.patch("/events/{event_id}/activate", dependencies=[EVENT_VIEW_ACCESS])
+async def activate_event(event_id: int, db: db_dependency):
+    event = db.query(Events).filter(Events.id == event_id).with_for_update().first()
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.status != "planned":
+        return {"status": event.status}
+
+    now = datetime.now(timezone.utc)
+    starts_at = parse_event_start_timestamp(event.starts_at)
+    if starts_at is None or starts_at > now:
+        raise HTTPException(status_code=409, detail="Event start time has not arrived")
+    if event_is_expired(event, now):
+        raise HTTPException(status_code=409, detail="Event has already ended")
+
+    event.status = "active"
+    event.updated_at = now.isoformat()
+    db.commit()
+    return {"status": event.status}
+
+
 @router.post("/events/{event_id}/stock", dependencies=[EVENT_ACCESS])
 async def allocate_event_stock(
     event_id: int,
@@ -173,7 +214,7 @@ async def allocate_event_stock(
         raise HTTPException(status_code=404, detail="Event not found")
     if event.status in {"closed", "cancelled", "archived"}:
         raise HTTPException(status_code=409, detail="Stock cannot be assigned to a closed event")
-    ends_at = parse_event_timestamp(event.ends_at or event.starts_at)
+    ends_at = parse_event_end_timestamp(event.starts_at, event.ends_at)
     if ends_at is not None and ends_at < datetime.now(timezone.utc):
         event.status = "closed"
         event.updated_at = datetime.now(timezone.utc).isoformat()

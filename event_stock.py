@@ -18,9 +18,30 @@ def parse_event_timestamp(value: str | None):
     return parsed.astimezone(timezone.utc)
 
 
+def parse_event_start_timestamp(value: str | None):
+    if value and len(value) == 10:
+        value = f"{value}T00:00:00"
+    return parse_event_timestamp(value)
+
+
+def parse_event_end_timestamp(starts_at: str | None, ends_at: str | None):
+    if ends_at:
+        return parse_event_timestamp(ends_at)
+    if not starts_at or len(starts_at) == 10:
+        return parse_event_timestamp(starts_at)
+    try:
+        parsed = datetime.fromisoformat(starts_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    parsed = parsed.replace(hour=23, minute=59, second=59, microsecond=0)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def event_is_expired(event: Events, now: datetime | None = None) -> bool:
     current_time = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    ends_at = parse_event_timestamp(event.ends_at or event.starts_at)
+    ends_at = parse_event_end_timestamp(event.starts_at, event.ends_at)
     return ends_at is not None and ends_at < current_time
 
 
@@ -29,13 +50,19 @@ def return_expired_event_stock(db, now: datetime | None = None) -> list[dict]:
     timestamp = now.isoformat()
 
     events = db.query(Events).filter(Events.status.in_(["planned", "active"])).all()
-    closed_changed = False
+    status_changed = False
     for event in events:
-        ends_at = parse_event_timestamp(event.ends_at or event.starts_at)
+        ends_at = parse_event_end_timestamp(event.starts_at, event.ends_at)
         if ends_at is not None and ends_at < now:
             event.status = "closed"
             event.updated_at = timestamp
-            closed_changed = True
+            status_changed = True
+            continue
+        starts_at = parse_event_start_timestamp(event.starts_at)
+        if event.status == "planned" and starts_at is not None and starts_at <= now:
+            event.status = "active"
+            event.updated_at = timestamp
+            status_changed = True
 
     allocations = db.query(EventStockAllocation).filter(
         EventStockAllocation.status == "active",
@@ -47,7 +74,7 @@ def return_expired_event_stock(db, now: datetime | None = None) -> list[dict]:
         event = db.query(Events).filter(Events.id == allocation.event_id).with_for_update().first()
         if event is None:
             continue
-        ends_at = parse_event_timestamp(event.ends_at or event.starts_at)
+        ends_at = parse_event_end_timestamp(event.starts_at, event.ends_at)
         if ends_at is None or ends_at >= now:
             continue
 
@@ -72,7 +99,7 @@ def return_expired_event_stock(db, now: datetime | None = None) -> list[dict]:
         ))
         returned.append({"event_id": event.id, "item_id": item.id, "quantity": str(remaining)})
 
-    if returned or closed_changed:
+    if returned or status_changed:
         db.commit()
         db.expire_all()
     return returned

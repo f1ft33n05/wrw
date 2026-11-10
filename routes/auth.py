@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta, timezone
 from math import ceil
 import time
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Form
 from fastapi import Request
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
-from jose import JWTError, jwt
+from jose import ExpiredSignatureError, JWTError, jwt
 from passlib.context import CryptContext
 from database_models import User, RolePermission
 from database import db_dependency
@@ -30,6 +30,12 @@ oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token', auto_error=False)
 
 login_attempts: dict[str, list[float]] = {}
 LOGIN_RATE_LIMIT_WINDOW_SECONDS = 5 * 60
+
+
+def safe_return_path(value: str | None) -> str | None:
+    if not value or not value.startswith("/") or value.startswith("//") or "\\" in value:
+        return None
+    return value
 
 
 def _check_login_rate_limit(request: Request) -> None:
@@ -79,6 +85,7 @@ async def login(
     request: Request,
     db: db_dependency,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    next_path: Annotated[str | None, Form(alias="next")] = None,
 ):
     try:
         _check_login_rate_limit(request)
@@ -91,6 +98,7 @@ async def login(
             {
                 "error_message": exc.detail,
                 "retry_after_seconds": int(exc.headers["Retry-After"]),
+                "next_path": safe_return_path(next_path),
             },
             status_code=exc.status_code,
         )
@@ -103,13 +111,19 @@ async def login(
         return templates.TemplateResponse(
             request,
             "auth.html",
-            {"error_message": "Incorrect username or password"},
+            {
+                "error_message": "Incorrect username or password",
+                "next_path": safe_return_path(next_path),
+            },
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
     token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     token = create_access_token(user.username, user.id, user.role, expires_delta=token_expires)
-    response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+    response = RedirectResponse(
+        url=safe_return_path(next_path) or "/dashboard",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
     response.set_cookie(
         key="access_token",
         value=token,
@@ -181,6 +195,12 @@ async def get_current_user(
         if user is None or user.username != username:
             raise credentials_exception
         return {"username": user.username, "name": user.name, "id": user.id, "role": user.role}
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Your session has expired. Please log in again.",
+            headers={"X-Session-Expired": "true"},
+        )
     except JWTError:
         raise credentials_exception
 

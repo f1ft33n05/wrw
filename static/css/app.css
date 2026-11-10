@@ -8,10 +8,11 @@ body {
 }
 
 header {
-    height: 10rem;
+    height: 8rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    border-bottom: #2a3140 solid 1px;
 }
 h1 {
     font-size: 2.4rem;
@@ -65,13 +66,13 @@ tbody {
 }
 
 #user-avatar img {
-    width: 5rem;
+    width: 4rem;
     border-radius: 50%;
 
 }
 
 .logo img {
-    height: 5rem;
+    height: 4rem;
 }
 
 .content-container {
@@ -663,6 +664,7 @@ tbody {
 .event-filter-tabs button {
     width: auto;
     margin: 0;
+    font-size: 1.5rem;
 }
 
 .event-filter-tabs button[aria-pressed="true"] {
@@ -696,6 +698,8 @@ tbody {
     top: .8rem;
     right: .8rem;
     display: flex;
+    flex-direction: column;
+    align-items: flex-end;
     gap: .5rem;
     opacity: 0;
     pointer-events: none;
@@ -718,6 +722,11 @@ tbody {
 .event-card-delete {
     background: var(--pico-del-color);
     border-color: var(--pico-del-color);
+}
+
+.event-card-cancel {
+    background: var(--pico-secondary);
+    border-color: var(--pico-secondary);
 }
 
 .event-card strong { font-size: 1.8rem; }

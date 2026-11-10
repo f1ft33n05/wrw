@@ -2,6 +2,9 @@
 <body>
     <div class="authentication-content row">
       <form action="/auth/login" method="post" class="login-form col-xs-12 col-md-5">
+        {% if next_path %}
+        <input type="hidden" name="next" value="{{ next_path }}">
+        {% endif %}
         <label for="username">Username:</label>
         <input type="text" id="username" name="username" required autocomplete="false">
 
@@ -42,7 +45,7 @@
           }
         };
         updateCountdown();
-      } else {
+      } else if (!{{ "true" if session_expired else "false" }}) {
         window.setTimeout(() => {
           document.querySelector(".login-error")?.remove();
         }, 3000);

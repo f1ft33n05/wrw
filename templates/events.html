@@ -19,7 +19,6 @@
               <label>Start date<input name="starts_at_date" type="date"></label>
               <label>Starts at<input name="starts_at_time" type="time"></label>
               <label>Ends at<input name="ends_at_time" type="time"></label>
-              <label>Status<select name="status"><option>planned</option><option>active</option><option>closed</option><option value="cancelled">canceled</option></select></label>
             </div>
             <label>End date<input name="ends_at_date" type="date"></label>
             <label>Description<textarea name="description"></textarea></label>
@@ -57,12 +56,17 @@
           </button>
           {% if user.role in ["admin", "manager"] %}
           <div class="event-card-actions">
-            {% if event.id in events_with_sales and event.status != "archived" %}
-            <button type="button" class="event-card-action" data-event-action="archive"
-              aria-label="Archive {{ event.name }}" title="Archive event">Archive</button>
-            {% elif event.id not in events_with_sales %}
+            {% if event.id not in events_with_sales %}
             <button type="button" class="event-card-action event-card-delete" data-event-action="delete"
               aria-label="Delete {{ event.name }}" title="Delete event">Delete</button>
+            {% endif %}
+            {% if event.status in ["planned", "active"] %}
+            <button type="button" class="event-card-action event-card-cancel" data-event-action="cancel"
+              aria-label="Mark {{ event.name }} as canceled" title="Mark as canceled">Mark as Canceled</button>
+            {% endif %}
+            {% if event.status != "archived" %}
+            <button type="button" class="event-card-action" data-event-action="archive"
+              aria-label="Archive {{ event.name }}" title="Archive event">Archive</button>
             {% endif %}
           </div>
           {% endif %}
@@ -116,6 +120,6 @@
       </dialog>
   </main>
   </div>
-  <script src="{{ url_for('static', path='js/events.js') }}?v=7"></script>
+  <script src="{{ url_for('static', path='js/events.js') }}?v=9"></script>
 </body>
 </html>

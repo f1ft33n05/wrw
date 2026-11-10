@@ -28,11 +28,26 @@ function isEventToday(startValue) {
 }
 
 function isEventEnded(endValue, startValue) {
-    const value = endValue || startValue;
+    let value = endValue || startValue;
+    if (!endValue && value && value.length > 10) {
+        const timezone = value.slice(10).match(/(Z|[+-]\d{2}:\d{2})$/)?.[0] || "";
+        value = `${value.slice(0, 10)}T23:59:59${timezone}`;
+    }
     const end = value && value.length === 10
         ? parseLocalDate(`${value}T23:59:59`)
         : parseLocalDate(value);
     return Boolean(end && end.getTime() < Date.now());
+}
+
+function localDateTime(date, time, defaultTime) {
+    if (!date) return null;
+    const timeValue = time || defaultTime;
+    const localDate = new Date(`${date}T${timeValue}`);
+    const offsetMinutes = -localDate.getTimezoneOffset();
+    const sign = offsetMinutes >= 0 ? "+" : "-";
+    const absoluteOffset = Math.abs(offsetMinutes);
+    const offset = `${sign}${String(Math.floor(absoluteOffset / 60)).padStart(2, "0")}:${String(absoluteOffset % 60).padStart(2, "0")}`;
+    return `${date}T${timeValue}${offset}`;
 }
 
 function updateCountdown(startValue, endValue) {
@@ -135,6 +150,35 @@ function filterEvents(filter) {
     noEventsInFilter.hidden = visibleCount > 0;
 }
 
+async function activateStartedEvents() {
+    for (const card of document.querySelectorAll('.event-card[data-status="planned"]')) {
+        const startsAt = parseLocalDate(card.dataset.start);
+        if (!startsAt || startsAt > new Date()) continue;
+
+        try {
+            const response = await fetch(`/events/${encodeURIComponent(card.dataset.id)}/activate`, {
+                method: "PATCH",
+                credentials: "same-origin",
+            });
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                throw new Error(body.detail || "Could not update event status.");
+            }
+            const body = await response.json();
+            if (body.status !== "active") continue;
+            card.dataset.status = "active";
+            card.querySelector("em").textContent = "Active";
+            if (window.eventCardBeingOpened === card) {
+                document.querySelector("#event-detail-type").textContent =
+                    [card.dataset.type, "active"].filter(Boolean).join(" · ");
+            }
+            filterEvents(document.querySelector('[data-event-filter][aria-pressed="true"]')?.dataset.eventFilter || "all");
+        } catch (error) {
+            document.querySelector("#event-action-error").textContent = error.message;
+        }
+    }
+}
+
 eventFilterTabs.forEach((tab) => {
     tab.addEventListener("click", () => {
         eventFilterTabs.forEach((filterTab) => {
@@ -151,9 +195,11 @@ eventGrid?.addEventListener("click", async (event) => {
     const eventCard = actionButton.closest(".event-card");
     const action = actionButton.dataset.eventAction;
     const eventName = eventCard.dataset.name;
-    const confirmation = action === "delete"
-        ? `Delete "${eventName}"? This cannot be undone.`
-        : `Archive "${eventName}"?`;
+    const confirmation = {
+        delete: `Delete "${eventName}"? This cannot be undone.`,
+        cancel: `Mark "${eventName}" as canceled?`,
+        archive: `Archive "${eventName}"?`,
+    }[action];
     if (!window.confirm(confirmation)) return;
 
     const actionError = document.querySelector("#event-action-error");
@@ -161,7 +207,7 @@ eventGrid?.addEventListener("click", async (event) => {
     actionButton.disabled = true;
     try {
         const response = await fetch(
-            `/events/${encodeURIComponent(eventCard.dataset.id)}${action === "archive" ? "/archive" : ""}`,
+            `/events/${encodeURIComponent(eventCard.dataset.id)}${action === "delete" ? "" : `/${action}`}`,
             {
                 method: action === "delete" ? "DELETE" : "PATCH",
                 credentials: "same-origin",
@@ -177,6 +223,9 @@ eventGrid?.addEventListener("click", async (event) => {
         actionButton.disabled = false;
     }
 });
+
+activateStartedEvents();
+setInterval(activateStartedEvents, 30000);
 
 document.querySelector("#close-event-dialog")?.addEventListener("click", () => eventDialog?.close());
 
@@ -241,11 +290,10 @@ if (eventForm) {
         const payload = {
             name: formData.get("name"),
             venue: formData.get("venue"),
-            starts_at: startDate ? `${startDate}${startTime ? `T${startTime}` : ""}` : null,
-            ends_at: endDate ? `${endDate}${endTime ? `T${endTime}` : ""}` : null,
+            starts_at: localDateTime(startDate, startTime, "00:00"),
+            ends_at: localDateTime(endDate, endTime, "23:59:59"),
             event_type: formData.get("event_type"),
             description: formData.get("description"),
-            status: formData.get("status"),
         };
         try {
             const response = await fetch("/events", {

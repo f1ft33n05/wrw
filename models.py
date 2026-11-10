@@ -246,7 +246,6 @@ class EventRequest(BaseModel):
     ends_at: str | None = None
     event_type: str | None = None
     description: str | None = None
-    status: str = "planned"
 
 
 class EventStockLineRequest(BaseModel):

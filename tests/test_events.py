@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 
 import pytest
 from fastapi import HTTPException
@@ -15,7 +16,9 @@ from database_models import (
     SalesTxn,
     StockMvt,
 )
-from routes.events import archive_event, delete_event
+from event_stock import return_expired_event_stock
+from models import EventRequest
+from routes.events import archive_event, cancel_event, create_event as create_event_route, delete_event
 
 
 @pytest.fixture
@@ -109,3 +112,63 @@ def test_delete_event_without_sales_succeeds(db):
 
     assert result == {"message": "Event deleted"}
     assert db.query(Events).filter(Events.id == event.id).first() is None
+
+
+def test_event_is_created_as_planned_even_if_status_is_sent(db):
+    payload = EventRequest(name="Test event", status="cancelled")
+
+    result = asyncio.run(create_event_route(payload, db))
+
+    assert db.query(Events).filter(Events.id == result["event_id"]).one().status == "planned"
+
+
+def test_planned_event_becomes_active_when_start_time_arrives(db):
+    event = Events(
+        name="Test event",
+        starts_at="2026-01-02T10:00:00+00:00",
+        ends_at="2026-01-03T10:00:00+00:00",
+        status="planned",
+    )
+    db.add(event)
+    db.commit()
+
+    return_expired_event_stock(db, now=datetime(2026, 1, 2, 10, 0, tzinfo=timezone.utc))
+
+    assert db.query(Events).filter(Events.id == event.id).one().status == "active"
+
+
+def test_event_without_end_time_stays_active_until_end_of_start_day(db):
+    event = Events(
+        name="Test event",
+        starts_at="2026-01-02T10:00:00+00:00",
+        status="planned",
+    )
+    db.add(event)
+    db.commit()
+
+    return_expired_event_stock(db, now=datetime(2026, 1, 2, 10, 1, tzinfo=timezone.utc))
+
+    assert db.query(Events).filter(Events.id == event.id).one().status == "active"
+
+
+def test_event_can_be_canceled_and_releases_remaining_stock(db):
+    event = create_event(db)
+    item = Item(name="Test item", quantity="8")
+    db.add(item)
+    db.commit()
+    db.add(
+        EventStockAllocation(
+            event_id=event.id,
+            item_id=item.id,
+            quantity="5",
+            quantity_remaining="3",
+            status="active",
+        )
+    )
+    db.commit()
+
+    result = asyncio.run(cancel_event(event.id, db))
+
+    assert result == {"message": "Event canceled"}
+    assert db.query(Events).filter(Events.id == event.id).one().status == "cancelled"
+    assert db.query(Item).filter(Item.id == item.id).one().quantity == "11"

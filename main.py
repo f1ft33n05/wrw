@@ -4,8 +4,9 @@ from decimal import Decimal, InvalidOperation
 import json
 import time
 import uuid
+from urllib.parse import urlencode
 from fastapi import FastAPI, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from database import engine, init_db, db_dependency
@@ -101,9 +102,36 @@ def render_error_page(request: Request, status_code: int, detail: str) -> Respon
     )
 
 
+def redirect_to_login(request: Request, session_expired: bool) -> RedirectResponse:
+    return_path = request.url.path
+    if request.url.query:
+        return_path = f"{return_path}?{request.url.query}"
+    query = {"next": return_path}
+    if session_expired:
+        query["session_expired"] = "1"
+    response = RedirectResponse(
+        url=f"/?{urlencode(query)}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+    if session_expired:
+        response.delete_cookie(
+            key="access_token",
+            path="/",
+            httponly=True,
+            secure=auth.ENVIRONMENT == "production" or request.url.scheme == "https",
+            samesite="lax",
+        )
+    return response
+
+
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> Response:
-    if wants_html(request) and exc.status_code in {401, 404, 500}:
+    if exc.status_code == status.HTTP_401_UNAUTHORIZED and wants_html(request):
+        return redirect_to_login(
+            request,
+            session_expired=bool(exc.headers and exc.headers.get("X-Session-Expired") == "true"),
+        )
+    if wants_html(request) and exc.status_code in {404, 500}:
         return render_error_page(request, exc.status_code, str(exc.detail))
     return JSONResponse(
         {"detail": exc.detail},
@@ -138,7 +166,19 @@ init_db()
 
 @app.get("/", response_class=HTMLResponse, status_code=status.HTTP_200_OK)
 async def root(request: Request):
-    return templates.TemplateResponse(request, "auth.html")
+    return templates.TemplateResponse(
+        request,
+        "auth.html",
+        {
+            "session_expired": request.query_params.get("session_expired") == "1",
+            "error_message": (
+                "Your session expired. Please log in again."
+                if request.query_params.get("session_expired") == "1"
+                else None
+            ),
+            "next_path": auth.safe_return_path(request.query_params.get("next")),
+        },
+    )
 
 @app.get(
     "/dashboard",
