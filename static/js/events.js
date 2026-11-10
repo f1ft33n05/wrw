@@ -200,7 +200,12 @@ eventGrid?.addEventListener("click", async (event) => {
         cancel: `Mark "${eventName}" as canceled?`,
         archive: `Archive "${eventName}"?`,
     }[action];
-    if (!window.confirm(confirmation)) return;
+    const confirmed = await window.appDialog.confirm(confirmation, {
+        title: action === "delete" ? "Delete event" : `${action[0].toUpperCase()}${action.slice(1)} event`,
+        confirmText: action === "delete" ? "Delete" : action === "cancel" ? "Mark as Canceled" : "Archive",
+        danger: action === "delete",
+    });
+    if (!confirmed) return;
 
     const actionError = document.querySelector("#event-action-error");
     actionError.textContent = "";

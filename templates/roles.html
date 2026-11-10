@@ -72,13 +72,16 @@
         ['can_view','can_create','can_edit','can_delete'].forEach(action => payload.permissions[input.value][action] = form.elements[input.value + '_' + action].checked);
       });
       const response = await fetch(roleId ? `/roles/${roleId}` : '/roles', {method: roleId ? 'PUT' : 'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
-      if (!response.ok) { alert(await response.text()); return; }
+      if (!response.ok) { await window.appDialog.alert(await response.text(), {title: 'Could not save role'}); return; }
       location.reload();
     });
     document.querySelectorAll('[data-delete-role]').forEach(button => button.addEventListener('click', async () => {
-      if (!confirm(`Delete the ${button.dataset.roleName} role?`)) return;
+      const confirmed = await window.appDialog.confirm(`Delete the ${button.dataset.roleName} role?`, {
+        title: 'Delete role', confirmText: 'Delete', danger: true
+      });
+      if (!confirmed) return;
       const response = await fetch(`/roles/${button.dataset.deleteRole}`, {method:'DELETE'});
-      if (!response.ok) { alert(await response.text()); return; }
+      if (!response.ok) { await window.appDialog.alert(await response.text(), {title: 'Could not delete role'}); return; }
       location.reload();
     }));
   </script>

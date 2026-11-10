@@ -122,7 +122,12 @@ document.querySelectorAll("[data-view-item]").forEach(button => button.addEventL
 document.querySelector("[data-close-item-details]").addEventListener("click", () => detailsDialog.close());
 
 document.querySelectorAll("[data-delete-item]").forEach(button => button.addEventListener("click", async () => {
-  if (!confirm("Delete this item?")) return;
+  const confirmed = await window.appDialog.confirm("Delete this item?", {
+    title: "Delete item",
+    confirmText: "Delete",
+    danger: true,
+  });
+  if (!confirmed) return;
   try { await api(`/items/${button.dataset.deleteItem}`, { method: "DELETE" }); location.reload(); }
-  catch (error) { alert(error.message); }
+  catch (error) { await window.appDialog.alert(error.message, { title: "Delete failed" }); }
 }));

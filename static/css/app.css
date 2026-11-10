@@ -740,6 +740,49 @@ tbody {
     color: var(--pico-del-color);
 }
 
+.app-confirm-dialog {
+    width: min(48rem, calc(100vw - 3rem));
+    padding: 0;
+    border: 0;
+    border-radius: .8rem;
+}
+
+.app-confirm-dialog article {
+    margin: 0;
+    padding: 2.4rem;
+}
+
+.app-confirm-dialog h2 {
+    margin-bottom: 1.2rem;
+    font-size: 2.2rem;
+}
+
+.app-confirm-dialog-message {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.app-confirm-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.app-confirm-dialog-actions button {
+    width: auto;
+    margin: 0;
+}
+
+.app-confirm-dialog-danger {
+    background: var(--pico-del-color);
+    border-color: var(--pico-del-color);
+}
+
+.app-confirm-dialog::backdrop {
+    background: rgb(0 0 0 / 55%);
+}
+
 .event-detail-dialog {
     width: min(52rem, calc(100vw - 3rem));
 }

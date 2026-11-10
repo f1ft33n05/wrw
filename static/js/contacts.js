@@ -87,7 +87,11 @@ if (editDialog && editForm) {
 
 document.querySelectorAll("[data-delete-contact]").forEach((button) => {
     button.addEventListener("click", async () => {
-        if (!window.confirm(`Delete ${button.dataset.contactName}?`)) {
+        const confirmed = await window.appDialog.confirm(
+            `Delete ${button.dataset.contactName}?`,
+            { title: "Delete contact", confirmText: "Delete", danger: true },
+        );
+        if (!confirmed) {
             return;
         }
         try {
@@ -101,7 +105,7 @@ document.querySelectorAll("[data-delete-contact]").forEach((button) => {
             }
             window.location.reload();
         } catch (error) {
-            window.alert(error.message);
+            await window.appDialog.alert(error.message, { title: "Delete failed" });
         }
     });
 });

@@ -55,7 +55,7 @@
           <td>{{ document.total_price|money }}</td>
           <td>
             <a role="button" class="secondary" href="/{{ document_type }}s/{{ document.id }}/print">View / Print</a>
-            {% if document_type == "quotation" %}<button type="button" data-convert-quotation="{{ document.id }}">Convert to invoice</button>{% endif %}
+            {% if document_type == "quotation" %}<button type="button" data-convert-quotation="{{ document.id }}">Convert to Invoice</button>{% endif %}
           </td>
         </tr>
         {% else %}
