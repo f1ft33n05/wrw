@@ -841,6 +841,80 @@ tbody td{
     margin-bottom: 3rem;
 }
 
+#assign-event-stock-form {
+    width: 60%;
+    padding: 3rem;
+    border: #2a3140 solid 1px;
+    border-radius: 0.5rem;
+}
+
+#assign-event-stock-form h2{
+    font-size: 2.5rem;
+    margin-bottom: 2rem;
+}
+
+#assign-event-stock-form menu {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+#assign-event-stock-form menu button {
+    font-size: 1.4rem;
+}
+
+#assign-event-stock-dialog {
+    width: min(90rem, calc(100vw - 3rem));
+}
+
+.event-stock-allocation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+    gap: 1rem;
+    max-height: min(60vh, 58rem);
+    overflow-y: auto;
+    padding: .2rem .5rem .5rem .2rem;
+}
+
+.event-stock-allocation-card {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    min-width: 0;
+    margin: 0;
+    padding: 1.2rem;
+    border: 1px solid var(--pico-muted-border-color);
+    border-radius: .6rem;
+    background: var(--pico-card-background-color);
+}
+
+.event-stock-item-name {
+    overflow-wrap: anywhere;
+    font-weight: 700;
+}
+
+.event-stock-available {
+    color: var(--pico-muted-color);
+    font-size: 1.3rem;
+}
+
+.event-stock-allocation-card input {
+    margin: 0;
+}
+
+.table-export-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .6rem;
+    margin: 0 0 1.2rem;
+}
+
+.table-export-actions button {
+    width: auto;
+    margin: 0;
+}
+
 .event-detail-dialog h2 {
     font-size: 2.6rem;
     margin-bottom: 3rem;
@@ -860,6 +934,33 @@ tbody td{
     border-radius: 50%;
     background-color: #861d13;
     border: none;
+}
+
+@media print {
+    body.table-export-printing > * {
+        visibility: hidden !important;
+    }
+
+    body.table-export-printing .table-export-print-target,
+    body.table-export-printing .table-export-print-target * {
+        visibility: visible !important;
+    }
+
+    body.table-export-printing .table-export-print-target {
+        position: fixed !important;
+        inset: 0 auto auto 0 !important;
+        width: 100% !important;
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    body.table-export-printing .table-export-print-target tr[data-filter-match="true"] {
+        display: table-row !important;
+    }
+
+    body.table-export-printing .table-export-print-target tr[data-filter-match="false"] {
+        display: none !important;
+    }
 }
 
 .event-countdown {
@@ -915,7 +1016,7 @@ tbody td{
     border: solid 0.1rem #2a3140;
 }
 
-.allocation-cart summary, .reconciliation-form summary, .reseller-stock-mvmt summary, .rec-pay-main-summ {
+.allocation-cart summary, .reconciliation-form summary, .reseller-stock-mvmt summary, .rec-pay-main-summ, .sales-filters-container summary {
     width: 50%;
     background-color: rgb(28 33 44);
     color: #fff;
@@ -1267,7 +1368,73 @@ aside details ul {
 }
 
 .report-actions {
-    margin-top: 4rem;
+    margin-top: 2rem;
+    display: flex;
+    justify-content: space-between;
+}
+
+.report-actions{
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sales-filters-container {
+    margin: 3rem 0;
+}
+
+.sales-filter li {
+    list-style: none;
+}
+
+.sales-filter {
+    display: flex;
+    height: 5rem;
+    align-items: flex-end;
+    justify-content: space-between;
+    width: 100%;
+    margin: 3rem 0;
+    padding: 0;
+
+}
+
+.sales-filter li,
+.sales-filter label {
+    margin: 0;
+}
+
+.sales-filter label {
+    min-width: 10rem;
+    font-size: 1.4rem;
+}
+
+.sales-filter select,
+.sales-filter input {
+    height: 3.8rem;
+    margin-bottom: 0;
+    font-size: 1.4rem;
+}
+
+.sales-filter button {
+    width: auto;
+    margin: 0;
+    font-size: 1.4rem;
+}
+
+.sales-totals-row {
+    border-top: 2px solid currentColor;
+    padding-top: 1rem;
+    margin-top: 1rem;
+    font-weight: 700;
+}
+
+.sales-totals-row td {
+    white-space: nowrap;
 }
 
 .A4-document-letterhead {

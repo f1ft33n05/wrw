@@ -43,8 +43,9 @@
       </tr>
     </template>
     <h2>All {{ document_type|title }}s</h2>
-    <table class="striped">
-      <thead><tr><th>Number</th><th>Customer</th><th>Date</th><th>Status</th><th>Total</th><th>Actions</th></tr></thead>
+
+    <table id="documents-table" class="striped">
+      <thead><tr><th>Number</th><th>Customer</th><th>Date</th><th>Status</th><th>Total</th><th data-export-exclude>Actions</th></tr></thead>
       <tbody>
         {% for document in documents %}
         <tr>
@@ -53,7 +54,7 @@
           <td>{{ document.issue_date or document.created_at }}</td>
           <td>{{ document.status|replace("_", " ")|title }}</td>
           <td>{{ document.total_price|money }}</td>
-          <td>
+          <td data-export-exclude>
             <a role="button" class="secondary" href="/{{ document_type }}s/{{ document.id }}/print">View / Print</a>
             {% if document_type == "quotation" %}<button type="button" data-convert-quotation="{{ document.id }}">Convert to Invoice</button>{% endif %}
           </td>

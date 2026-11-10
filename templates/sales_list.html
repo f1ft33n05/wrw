@@ -99,7 +99,54 @@
             </details>
         </article>
         <h2>All Sales</h2>
-        <table class="striped">
+          <details class="sales-filters-container">
+              <summary>Filters</summary>
+              <form id="sales-filters">
+                <ul class="sales-filter" aria-label="Filter sales">
+                  <li><label>Customer
+                    <select id="sales-filter-customer"><option value="">All customers</option>
+                      {% for customer_id, customer_name in customer_options %}
+                      <option value="{{ customer_id }}">{{ customer_name }}</option>
+                      {% endfor %}
+                    </select>
+                  </label></li>
+                  <li><label>Payment method
+                    <select id="sales-filter-payment"><option value="">All methods</option>
+                      {% for method in payment_methods %}
+                      <option value="{{ method }}">{{ method|title }}</option>
+                      {% endfor %}
+                    </select>
+                  </label></li>
+                  <li><label>Event
+                    <select id="sales-filter-event"><option value="">All events</option><option value="store">Store</option>
+                      {% for event in events %}
+                      <option value="{{ event.id }}">{{ event.name }}</option>
+                      {% endfor %}
+                    </select>
+                  </label></li>
+                  <li><label>Status
+                    <select id="sales-filter-status"><option value="">All statuses</option>
+                      {% for sale_status in status_options %}
+                      <option value="{{ sale_status }}">{{ sale_status|replace("_", " ")|title }}</option>
+                      {% endfor %}
+                    </select>
+                  </label></li>
+                  <li><label>From<input id="sales-filter-from" type="date"></label></li>
+                  <li><label>To<input id="sales-filter-to" type="date"></label></li>
+                  <li><button type="button" class="primary" id="sales-filter-clear">Reset</button></li>
+                </ul>
+              </form>
+          </details>      
+        
+        <div class="report-actions">
+          <ul></ul>
+          <div class="table-export-actions no-print">
+            <button type="button" data-export-action="excel" data-export-target="#all-sales-table" data-export-name="All-Sales" data-export-filtered>Excel</button>
+            <button type="button" class="secondary" data-export-action="csv" data-export-target="#all-sales-table" data-export-name="All-Sales" data-export-filtered>CSV</button>
+            <button type="button" class="secondary" data-export-action="print" data-export-target="#all-sales-table">Print</button>
+          </div>
+        </div>
+        <table id="all-sales-table" class="striped" data-currency="{{ currency }}">
           <thead>
             <tr>
               <th scope="col">Invoice</th>
@@ -110,13 +157,21 @@
               <th scope="col">Paid</th>
               <th scope="col">Balance Due</th>
               <th scope="col">Status</th>
-              <th scope="col">Receipt</th>
-              <th scope="col">Payment</th>
+              <th scope="col" data-export-exclude>Receipt</th>
+              <th scope="col" data-export-exclude>Payment</th>
             </tr>
           </thead>
           <tbody>
             {% for sale in sales %}
-            <tr>
+            <tr data-sale-row data-filter-match="true"
+              data-customer-id="{{ sale.customer_id }}"
+              data-payment-methods="{{ sale.payment_methods|join('|') }}"
+              data-event-id="{{ sale.event_id }}"
+              data-status="{{ sale.invoice.status|lower }}"
+              data-date="{{ sale.created_at_iso or '' }}"
+              data-total="{{ sale.total }}"
+              data-paid="{{ sale.paid }}"
+              data-balance="{{ sale.balance_due }}">
               <td>#{{ sale.invoice.id }}</td>
               <td>{{ sale.customer_name or "Walk-in customer" }}</td>
               <td>{{ sale.event_name or "Store" }}</td>
@@ -125,25 +180,33 @@
               <td>{{ sale.paid|money }}</td>
               <td>{{ sale.balance_due|money }}</td>
               <td>{{ sale.invoice.status|replace("_", " ")|title }}</td>
-              <td><a href="/sales/{{ sale.invoice.id }}/receipt">View</a></td>
-              <td>
+              <td data-export-exclude><a href="/sales/{{ sale.invoice.id }}/receipt">View</a></td>
+              <td data-export-exclude>
                 {% if sale.balance_due > 0 %}
                 <button type="button" class="pay-invoice-button" data-invoice-id="{{ sale.invoice.id }}" data-balance="{{ sale.balance_due }}">Record payment</button>
                 {% else %}Paid{% endif %}
               </td>
             </tr>
             {% else %}
-            <tr>
+            <tr data-sales-empty {% if sales %}hidden{% endif %}>
               <td colspan="10">No sales found.</td>
             </tr>
             {% endfor %}
           </tbody>
+          <tfoot>
+            <tr class="sales-totals-row">
+              <th colspan="4">Totals (<span id="sales-total-count">{{ sales|length }}</span> sales)</th>
+              <td id="sales-total-due">{{ sales_totals.total|money }}</td>
+              <td id="sales-total-paid">{{ sales_totals.paid|money }}</td>
+              <td id="sales-total-balance">{{ sales_totals.balance_due|money }}</td>
+              <td colspan="3"></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </main>
   </div>
-</body>
   <script src="{{ url_for('static', path='js/pos.js') }}"></script>
-  <script src="{{ url_for('static', path='js/sales-list.js') }}"></script>
-
+  <script src="{{ url_for('static', path='js/sales-list.js') }}?v=3"></script>
+</body>
 </html>

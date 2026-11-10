@@ -11,7 +11,7 @@ WRW is a FastAPI and SQLAlchemy business management application with server-rend
 - Events with event-linked sales reporting
 - Printable quotations and invoices
 - Sales, inventory, trend, purchase, and combined reports
-- Excel, CSV, and PDF exports
+- Excel, CSV, and print exports for reports, sales, statements, quotes, and receipts
 - Database-backed roles and module permissions
 - User management and JWT authentication
 
@@ -22,7 +22,7 @@ WRW is a FastAPI and SQLAlchemy business management application with server-rend
 - Jinja2 templates
 - Pydantic
 - Python-JOSE and Passlib
-- OpenPyXL and ReportLab
+- OpenPyXL
 - HTML, CSS, and vanilla JavaScript
 
 ## Setup

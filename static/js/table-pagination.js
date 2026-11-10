@@ -5,7 +5,11 @@
     if (table.dataset.paginationInitialized || table.hasAttribute("data-no-pagination")) return;
 
     const tbody = table.tBodies[0];
-    if (!tbody || !tbody.rows.length) return;
+    if (
+      !tbody
+      || !tbody.rows.length
+      || (tbody.rows.length === 1 && tbody.rows[0].hasAttribute("data-sales-empty"))
+    ) return;
 
     table.dataset.paginationInitialized = "true";
     table.classList.add("paginated-table");
@@ -29,25 +33,34 @@
     const summary = container.querySelector(".table-pagination-summary");
     const previous = container.querySelector('[data-table-page="previous"]');
     const next = container.querySelector('[data-table-page="next"]');
-    const rows = Array.from(tbody.rows);
+    const rows = Array.from(tbody.rows).filter((row) => !row.hasAttribute("data-sales-empty"));
     let currentPage = 1;
 
     function render() {
       const pageSize = Number(select.value);
-      const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+      const matchingRows = rows.filter((row) => row.dataset.filterMatch !== "false");
+      const matchingRowSet = new Set(matchingRows);
+      const pageCount = Math.max(1, Math.ceil(matchingRows.length / pageSize));
       currentPage = Math.min(currentPage, pageCount);
 
       const start = (currentPage - 1) * pageSize;
-      const end = Math.min(start + pageSize, rows.length);
+      const end = Math.min(start + pageSize, matchingRows.length);
+      let matchIndex = 0;
       rows.forEach((row, index) => {
-        row.hidden = index < start || index >= end;
+        if (!matchingRowSet.has(row)) {
+          row.hidden = true;
+          return;
+        }
+        row.hidden = matchIndex < start || matchIndex >= end;
+        matchIndex += 1;
       });
 
-      summary.textContent = `${start + 1}-${end} of ${rows.length}`;
+      summary.textContent = `${matchingRows.length ? start + 1 : 0}-${end} of ${matchingRows.length}`;
       previous.disabled = currentPage === 1;
       next.disabled = currentPage === pageCount;
       previous.setAttribute("aria-label", `Previous page, current page ${currentPage}`);
       next.setAttribute("aria-label", `Next page, current page ${currentPage}`);
+      table.dispatchEvent(new Event("tablepagerender"));
     }
 
     select.addEventListener("change", () => {
@@ -60,6 +73,10 @@
     });
     next.addEventListener("click", () => {
       currentPage += 1;
+      render();
+    });
+    table.addEventListener("tablefilterchange", () => {
+      currentPage = 1;
       render();
     });
     render();

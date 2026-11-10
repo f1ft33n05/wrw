@@ -4,34 +4,59 @@
     .no-print { display: none !important; }
     main.receipt { max-width: 100%; padding: 0; }
   }
-  img {
-    width: 30rem;
-    padding: 1rem;
-    margin-bottom: 3rem;
-  }
+
 </style>
 <body>
-  <main class="container receipt">
+  {% include "navbar.html" %}
+
+  <!-- <main class="container receipt">
     <nav class="no-print">
       <ul><li><strong>Reseller payment receipt</strong></li></ul>
       <ul>
         <li><a href="/reseller_pg?reseller_id={{ reseller.id }}">Reseller account</a></li>
-        <li><button type="button" onclick="window.print()">Print</button></li>
+        <li><button type="button" data-export-action="excel" data-export-target="#reseller-payment-receipt" data-export-name="Reseller-Receipt-{{ payment.id }}">Excel</button></li>
+        <li><button type="button" class="secondary" data-export-action="csv" data-export-target="#reseller-payment-receipt" data-export-name="Reseller-Receipt-{{ payment.id }}">CSV</button></li>
+        <li><button type="button" class="secondary" data-export-action="print" data-export-target="#reseller-payment-receipt">Print</button></li>
       </ul>
     </nav>
-    <article>
+    <article id="reseller-payment-receipt">
       <img src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="">
       <h2>Receipt #: RP-{{ payment.id }}</h2>
       <h3>Date: {{ payment_date }}</h3>
       <p><strong>Reseller:</strong> {{ reseller.name }}</p>
       {% if reseller.phone %}<p><strong>Phone:</strong> {{ reseller.phone }}</p>{% endif %}
-      {% if reseller.address %}<p><strong>Address:</strong> {{ reseller.address }}</p>{% endif %}
+      {% if reseller.address %}<p><strong>Address:</strong> {{ reseller.address }}</p>{% endif %} -->
+  <main class="content-container receipt">
+    <div class="receipt-page-actions">
+      <a role="button" class="secondary no-print" href="/sales/pos"><-- POS</a>
+      <button class="no-print" type="button" data-export-action="print" data-export-target="#receipt-content">Print</button>
+    </div>
+    <article id="receipt-content">
+        <div class="business-details">
+          <img id="receipt-logo" src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="">
+          <p>Area 47, Sector 4. Lilongwe. Malawi.</p>
+          <p>info@wearewines.com</p>
+          <p>+265 (0) 999 123 456</p>
+        </div>
+        <div class="receipt-metadata">
+          <h3>Receipt #: RP-{{ payment.id }}</h3>
+          <h3>Date: {{ payment_date }}</h3>
+          <p><strong>Reseller:</strong> {{ reseller.name }}</p>
+          {% if reseller.phone %}
+          <p>
+            <strong>Phone:</strong> {{ reseller.phone }}</p>
+          {% endif %}
+          {% if reseller.address %}
+          <p><strong>Address:</strong> {{ reseller.address }}</p>
+          {% endif %}
+        </div>
+
 
       <table data-no-pagination data-no-table-scroll>
         <thead><tr><th>Description</th><th>Method</th><th>Amount</th></tr></thead>
         <tbody>
           <tr>
-            <td>Reseller reconciliation payment</td>
+            <td>Reconciliation Payment</td>
             <td>{{ payment.payment_method|replace("_", " ")|title }}</td>
             <td>{{ amount|money }}</td>
           </tr>

@@ -101,13 +101,15 @@
         <form method="dialog" id="assign-event-stock-form">
           <h2>Assign Event Stock</h2>
           <input type="hidden" id="assign-event-id">
-          <div id="event-stock-allocation-rows">
+          <div id="event-stock-allocation-rows" class="event-stock-allocation-grid hide-scrollbar">
             {% for item in stock_items %}
-            <label>
-              {{ item.name }}
+            <label class="event-stock-allocation-card">
+              <span class="event-stock-item-name">{{ item.name }}</span>
+              <span class="event-stock-available">Available: {{ item.quantity }}</span>
               <input type="number" min="0" step="0.01" name="allocation-{{ item.id }}"
                 data-item-id="{{ item.id }}" data-item-name="{{ item.name }}"
-                placeholder="Available: {{ item.quantity }}">
+                aria-label="Quantity of {{ item.name }} to assign"
+                placeholder="Quantity to assign">
             </label>
             {% endfor %}
           </div>

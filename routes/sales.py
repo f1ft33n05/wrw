@@ -242,11 +242,16 @@ async def sales_list(request: Request, user: user_dependency, db: db_dependency)
         else []
     )
     paid_by_invoice: dict[int, Decimal] = {}
+    payment_methods_by_invoice: dict[int, set[str]] = {}
     for payment in payments:
         paid_by_invoice[payment.invoice_id] = (
             paid_by_invoice.get(payment.invoice_id, Decimal("0"))
             + _decimal(payment.amount, "payment amount")
         )
+        if payment.payment_method:
+            payment_methods_by_invoice.setdefault(payment.invoice_id, set()).add(
+                payment.payment_method.strip().lower()
+            )
 
     customer_ids = {
         invoice.customer_id for invoice in invoices if invoice.customer_id is not None
@@ -265,14 +270,44 @@ async def sales_list(request: Request, user: user_dependency, db: db_dependency)
         sales.append(
             {
                 "invoice": invoice,
+                "customer_id": str(invoice.customer_id) if invoice.customer_id is not None else "walk-in",
                 "customer_name": customer.name if customer is not None else None,
+                "event_id": str(invoice.event_id) if invoice.event_id is not None else "store",
                 "event_name": event_by_id[invoice.event_id].name if invoice.event_id in event_by_id else None,
                 "created_at": _display_timestamp(invoice.created_at),
+                "created_at_iso": _timestamp(invoice.created_at),
                 "total": total,
                 "paid": paid,
                 "balance_due": max(total - paid, Decimal("0")),
+                "payment_methods": sorted(payment_methods_by_invoice.get(invoice.id, set())),
             }
         )
+    sales_totals = {
+        "total": sum((sale["total"] for sale in sales), Decimal("0")),
+        "paid": sum((sale["paid"] for sale in sales), Decimal("0")),
+        "balance_due": sum((sale["balance_due"] for sale in sales), Decimal("0")),
+    }
+    payment_methods = sorted(
+        {
+            method
+            for sale in sales
+            for method in sale["payment_methods"]
+        }
+    )
+    customer_options = sorted(
+        {
+            (sale["customer_id"], sale["customer_name"] or "Walk-in customer")
+            for sale in sales
+        },
+        key=lambda customer: customer[1].casefold(),
+    )
+    status_options = sorted(
+        {
+            sale["invoice"].status.lower()
+            for sale in sales
+            if sale["invoice"].status
+        }
+    )
 
     return templates.TemplateResponse(
         request,
@@ -280,6 +315,11 @@ async def sales_list(request: Request, user: user_dependency, db: db_dependency)
         {
             "user": user,
             "sales": sales,
+            "sales_totals": sales_totals,
+            "payment_methods": payment_methods,
+            "customer_options": customer_options,
+            "status_options": status_options,
+            "currency": CURRENCY_CODE,
             "items": items,
             "customers": customers,
             "events": events,

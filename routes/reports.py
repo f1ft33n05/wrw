@@ -9,10 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from openpyxl.utils import get_column_letter
 from starlette import status
 
 from database import db_dependency
@@ -421,7 +418,10 @@ async def export_report(
             worksheet.cell(summary_row, 1).font = Font(bold=True)
             worksheet.cell(summary_row, 2).font = Font(bold=True)
         for index, column in enumerate(columns, start=1):
-            worksheet.column_dimensions[worksheet.cell(1, index).column_letter].width = max(12, min(35, len(column) + 4))
+            worksheet.column_dimensions[get_column_letter(index)].width = max(
+                12,
+                min(35, len(column) + 4),
+            )
         for row in worksheet.iter_rows(min_row=4):
             for cell in row:
                 cell.alignment = Alignment(vertical="top", wrap_text=True)
@@ -433,47 +433,6 @@ async def export_report(
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f'attachment; filename="{filename}.xlsx"'},
         )
-
-    if file_format == "pdf":
-        output = BytesIO()
-        page_size = landscape(A4)
-        document = SimpleDocTemplate(output, pagesize=page_size, title=title)
-        styles = getSampleStyleSheet()
-        story = [
-            Paragraph(title, styles["Title"]),
-            Paragraph(f"Date range: {date_range}", styles["Normal"]),
-            Spacer(1, 12),
-        ]
-        story.append(Paragraph("<b>Financial Totals</b>", styles["Heading2"]))
-        for label, key in (
-            ("Total Sales", "total_sales"),
-            ("Total Payments", "total_payments"),
-            ("Receipts", "receipts"),
-            ("Total Purchases", "total_purchases"),
-            ("Supplier Payments", "supplier_payments"),
-            ("Inventory Value", "inventory_value"),
-            ("Accounts Receivable", "accounts_receivable"),
-        ):
-            story.append(Paragraph(f"<b>{label}:</b> {summary[key]}", styles["Normal"]))
-        story.append(Spacer(1, 12))
-        table_data = [columns] + [[str(row.get(column, "")) for column in columns] for row in rows]
-        table_data.append([str(totals.get(column, "")) for column in columns])
-        table = Table(table_data, repeatRows=1)
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#6D2C91")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F4EDF7")]),
-            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
-        ]))
-        story.append(table)
-        document.build(story)
-        output.seek(0)
-        return StreamingResponse(output, media_type="application/pdf",
-                                 headers={"Content-Disposition": f'attachment; filename="{filename}.pdf"'})
 
     raise HTTPException(status_code=404, detail="Unsupported export format")
 

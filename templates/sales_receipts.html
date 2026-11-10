@@ -5,11 +5,16 @@
   {% include "sidebar.html" %}
   <main  class="receipts-page col-xs-12 col-md-9">
     <h1>Receipts</h1>
-    <table class="striped">
-      <thead><tr><th>Receipt / Invoice</th><th>Customer</th><th>Date</th><th>Total</th><th>Action</th></tr></thead>
+    <nav class="table-export-actions no-print" aria-label="Export receipts">
+      <button type="button" data-export-action="excel" data-export-target="#receipts-table" data-export-name="Receipts">Excel</button>
+      <button type="button" class="secondary" data-export-action="csv" data-export-target="#receipts-table" data-export-name="Receipts">CSV</button>
+      <button type="button" class="secondary" data-export-action="print" data-export-target="#receipts-table">Print</button>
+    </nav>
+    <table id="receipts-table" class="striped">
+      <thead><tr><th>Receipt / Invoice</th><th>Customer</th><th>Date</th><th>Total</th><th data-export-exclude>Action</th></tr></thead>
       <tbody>
         {% for receipt in receipts %}
-        <tr><td>{{ receipt.document_number }}</td><td>{{ receipt.customer }}</td><td>{{ receipt.created_at }}</td><td>{{ receipt.total|money }}</td><td><a href="{{ receipt.receipt_url }}">View receipt</a></td></tr>
+        <tr><td>{{ receipt.document_number }}</td><td>{{ receipt.customer }}</td><td>{{ receipt.created_at }}</td><td>{{ receipt.total|money }}</td><td data-export-exclude><a href="{{ receipt.receipt_url }}">View receipt</a></td></tr>
         {% else %}
         <tr><td colspan="5">No receipts found.</td></tr>
         {% endfor %}

@@ -25,14 +25,13 @@
       <div class="col-xs-12 col-md-3 no-print">
         {% include "preview_list.html" %}
       </div>
-      <article class="statement-A4-preview col-xs-12 col-md-9">
+      <article id="reseller-statement" class="statement-A4-preview col-xs-12 col-md-9">
         <nav class="no-print">
           <ul></ul>
-          <ul>
-            <li><a role="button" class="secondary" href="/reports/export/xlsx?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Excel</a></li>
-            <li><a role="button" class="secondary" href="/reports/export/pdf?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">PDF</a></li>
-            <li><a role="button" class="secondary" href="/reports/export/csv?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">CSV</a></li>
-            <li><button type="button" onclick="window.print()">Print</button></li>
+          <ul class="table-export-actions">
+            <li><button type="button" data-export-action="excel" data-export-target="#reseller-statement" data-export-name="Reseller-Statement">Excel</button></li>
+            <li><button type="button" class="secondary" data-export-action="csv" data-export-target="#reseller-statement" data-export-name="Reseller-Statement">CSV</button></li>
+            <li><button type="button" class="secondary" data-export-action="print" data-export-target="#reseller-statement">Print</button></li>
           </ul>
         </nav>
         <div  class="A4-document-letterhead">

@@ -56,3 +56,81 @@ paymentDialog.querySelector("#invoice-payment-form").addEventListener("submit", 
         error.textContent = paymentError.message;
     }
 });
+
+const salesTable = document.querySelector("#all-sales-table");
+const saleRows = [...(salesTable?.querySelectorAll("[data-sale-row]") || [])];
+const salesFilters = {
+    customer: document.querySelector("#sales-filter-customer"),
+    payment: document.querySelector("#sales-filter-payment"),
+    event: document.querySelector("#sales-filter-event"),
+    status: document.querySelector("#sales-filter-status"),
+    from: document.querySelector("#sales-filter-from"),
+    to: document.querySelector("#sales-filter-to"),
+};
+const emptySalesRow = salesTable?.querySelector("[data-sales-empty]");
+
+function formatSalesTotal(cents) {
+    return `${salesTable.dataset.currency} ${(cents / 100).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+}
+
+function updateSalesFilters() {
+    const from = salesFilters.from.value;
+    const to = salesFilters.to.value;
+    let matchCount = 0;
+
+    saleRows.forEach((row) => {
+        const saleDate = /^\d{4}-\d{2}-\d{2}/.test(row.dataset.date)
+            ? row.dataset.date.slice(0, 10)
+            : "";
+        const methods = row.dataset.paymentMethods.split("|").filter(Boolean);
+        const matches = (!salesFilters.customer.value || row.dataset.customerId === salesFilters.customer.value)
+            && (!salesFilters.payment.value || methods.includes(salesFilters.payment.value))
+            && (!salesFilters.event.value || row.dataset.eventId === salesFilters.event.value)
+            && (!salesFilters.status.value || row.dataset.status === salesFilters.status.value)
+            && (!from || (saleDate && saleDate >= from))
+            && (!to || (saleDate && saleDate <= to));
+
+        row.dataset.filterMatch = String(matches);
+        row.hidden = !matches;
+        if (!matches) return;
+
+        matchCount += 1;
+    });
+
+    if (emptySalesRow) emptySalesRow.hidden = matchCount > 0;
+    salesTable?.dispatchEvent(new Event("tablefilterchange"));
+    updateVisibleSalesTotals();
+}
+
+function updateVisibleSalesTotals() {
+    const visibleRows = saleRows.filter((row) => !row.hidden);
+    const totals = visibleRows.reduce((sum, row) => ({
+        total: sum.total + Math.round(Number(row.dataset.total) * 100),
+        paid: sum.paid + Math.round(Number(row.dataset.paid) * 100),
+        balance: sum.balance + Math.round(Number(row.dataset.balance) * 100),
+    }), { total: 0, paid: 0, balance: 0 });
+
+    document.querySelector("#sales-total-count").textContent = visibleRows.length;
+    document.querySelector("#sales-total-due").textContent = formatSalesTotal(totals.total);
+    document.querySelector("#sales-total-paid").textContent = formatSalesTotal(totals.paid);
+    document.querySelector("#sales-total-balance").textContent = formatSalesTotal(totals.balance);
+}
+
+document.querySelector("#sales-filters")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    updateSalesFilters();
+});
+Object.values(salesFilters).forEach((filter) => {
+    filter?.addEventListener("change", updateSalesFilters);
+});
+salesTable?.addEventListener("tablepagerender", updateVisibleSalesTotals);
+
+document.querySelector("#sales-filter-clear")?.addEventListener("click", () => {
+    Object.values(salesFilters).forEach((filter) => {
+        if (filter) filter.value = "";
+    });
+    updateSalesFilters();
+});

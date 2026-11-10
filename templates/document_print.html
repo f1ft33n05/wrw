@@ -24,15 +24,11 @@
     {% include "sidebar.html" %}
     <main class="col-xs-12 col-md-9 row">
       {% include "preview_list.html" %}
-      <article class="document-preview col-xs-12 col-md-9">
-        <nav class="no-print">
-          <ul></ul>
-          <ul>
-            <li><a role="button" class="secondary" href="/reports/export/xlsx?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Excel</a></li>
-            <li><a role="button" class="secondary" href="/reports/export/pdf?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">PDF</a></li>
-            <li><a role="button" class="secondary" href="/reports/export/csv?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">CSV</a></li>
-            <li><button type="button" onclick="window.print()">Print</button></li>
-          </ul>
+      <article id="document-preview" class="document-preview col-xs-12 col-md-9">
+        <nav class="no-print table-export-actions" aria-label="Export document">
+          <button type="button" data-export-action="excel" data-export-target="#document-preview" data-export-name="{{ display_document_number }}">Excel</button>
+          <button type="button" class="secondary" data-export-action="csv" data-export-target="#document-preview" data-export-name="{{ display_document_number }}">CSV</button>
+          <button type="button" class="secondary" data-export-action="print" data-export-target="#document-preview">Print</button>
         </nav>
         <!-- <div class="letterhead">
           <img src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="We are Wines">

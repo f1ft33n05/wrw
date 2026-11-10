@@ -16,11 +16,18 @@
         <article><strong>Balance due</strong><p>{{ balance_due|money }}</p></article>
       </section>
       <h2>Event sales</h2>
-      <table class="striped">
-        <thead><tr><th>Invoice</th><th>Date</th><th>Total</th><th>Status</th><th>Receipt</th></tr></thead>
+      <div class="report-actions">
+          <span>
+            <a role="button" class="secondary" href="/reports/export/xlsx?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Excel</a>
+            <a role="button" class="secondary" href="/reports/export/csv?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">CSV</a>
+            <button type="button" onclick="window.print()">Print</button>
+          </span>
+        </div>
+      <table id="event-sales-table" class="striped">
+        <thead><tr><th>Invoice</th><th>Date</th><th>Total</th><th>Status</th><th data-export-exclude>Receipt</th></tr></thead>
         <tbody>
           {% for invoice in invoices %}
-          <tr><td>#{{ invoice.id }}</td><td>{{ invoice.created_at }}</td><td>{{ invoice.total_price|money }}</td><td>{{ invoice.status|replace("_", " ")|title }}</td><td><a href="/sales/{{ invoice.id }}/receipt">View</a></td></tr>
+          <tr><td>#{{ invoice.id }}</td><td>{{ invoice.created_at }}</td><td>{{ invoice.total_price|money }}</td><td>{{ invoice.status|replace("_", " ")|title }}</td><td data-export-exclude><a href="/sales/{{ invoice.id }}/receipt">View</a></td></tr>
           {% else %}
           <tr><td colspan="5">No sales have been recorded for this event.</td></tr>
           {% endfor %}

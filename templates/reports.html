@@ -27,7 +27,6 @@
           <strong></strong>
           <span>
             <a role="button" class="secondary" href="/reports/export/xlsx?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">Excel</a>
-            <a role="button" class="secondary" href="/reports/export/pdf?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">PDF</a>
             <a role="button" class="secondary" href="/reports/export/csv?type={{ report_type }}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">CSV</a>
             <button type="button" onclick="window.print()">Print</button>
           </span>

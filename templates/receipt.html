@@ -15,9 +15,11 @@
   <main class="content-container receipt">
     <div class="receipt-page-actions">
       <a role="button" class="secondary no-print" href="/sales/pos"><-- POS</a>
-      <button class="no-print" type="button" onclick="window.print()">Print</button>
+      <button class="no-print" type="button" data-export-action="excel" data-export-target="#receipt-content" data-export-name="Receipt-{{ invoice.id }}">Excel</button>
+      <button class="no-print secondary" type="button" data-export-action="csv" data-export-target="#receipt-content" data-export-name="Receipt-{{ invoice.id }}">CSV</button>
+      <button class="no-print secondary" type="button" data-export-action="print" data-export-target="#receipt-content">Print</button>
     </div>
-    <article>
+    <article id="receipt-content">
         <div class="business-details">
           <img id="receipt-logo" src="{{ url_for('static', path='images/wrw-dark.png') }}" alt="">
           <p>Area 47, Sector 4. Lilongwe. Malawi.</p>
