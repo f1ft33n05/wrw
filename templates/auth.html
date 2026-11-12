@@ -1,5 +1,8 @@
 {%include "header.html" %}
 <body>
+  <img src="{{ url_for('static', path='images/illustration1.png') }}" alt="Illustration 1" class="floating-illustration illustration1">
+  <img src="{{ url_for('static', path='images/illustration2.png') }}" alt="Illustration 2" class="floating-illustration illustration2">
+  <img src="{{ url_for('static', path='images/illustration3.png') }}" alt="Illustration 3" class="floating-illustration illustration3">
     <div class="authentication-content row">
       <form action="/auth/login" method="post" class="login-form col-xs-12 col-md-5">
         {% if next_path %}
@@ -26,7 +29,6 @@
         <img src="{{ url_for('static', path='images/wrw-logo.png') }}" alt="We Are Wines" class="illustration-image">
       </div>
     </div>
-    {%include "footer.html" %}
     {% if error_message %}
     <script>
       const countdown = document.querySelector("#login-retry-countdown");
@@ -52,5 +54,6 @@
       }
     </script>
     {% endif %}
+    {%include "footer.html" %}
 </body>
 </html>

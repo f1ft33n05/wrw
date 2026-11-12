@@ -330,6 +330,29 @@ class Payments(Base):
     created_at = Column(String)
     updated_at = Column(String)
 
+
+class SalesReturns(Base):
+    __tablename__ = "sales_returns"
+
+    id = Column(Integer, primary_key=True, index=True)
+    invoice_id = Column(Integer, nullable=False, index=True)
+    refund_method = Column(String, nullable=False)
+    total_refund = Column(String, nullable=False)
+    processed_by = Column(Integer)
+    created_at = Column(String, nullable=False)
+
+
+class SalesReturnLines(Base):
+    __tablename__ = "sales_return_lines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    return_id = Column(Integer, nullable=False, index=True)
+    sale_txn_id = Column(Integer, nullable=False, index=True)
+    item_id = Column(Integer, nullable=False)
+    quantity = Column(String, nullable=False)
+    refund_amount = Column(String, nullable=False)
+
+
 class PaymmetMethods(Base):
     __tablename__ = "payment_methods"
 

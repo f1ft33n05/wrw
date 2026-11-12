@@ -2,113 +2,163 @@
 <body>
   {% include "navbar.html" %}
   <main class="pos-page">
-    <form id="pos-form" class="pos-layout">
-        <div class="cart-operations">
-            <section class="pos-cart-panel">
-                <div class="pos-cart-toolbar">
-                    <select name="customer_id" aria-label="Customer">
-                      <option value="">Walk-in customer</option>
-                      {% for customer in customers %}
-                      <option value="{{ customer.id }}">{{ customer.name }}</option>
-                      {% endfor %}
-                    </select>
-                    <input id="pos-search" type="search" list="pos-product-options"  autocomplete="off"
-                      placeholder="Search product by name or SKU...">
-                    
-                </div>
-                <input type="hidden" name="event_id" value="{{ selected_event_id or '' }}">
-                <input type="hidden" name="location" value="store">
-              <div class="pos-cart-table hide-scrollbar">
-                <table data-no-pagination>
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th>Qty</th>
-                      <th>Unit price</th>
-                      <th>Total</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody id="cart-lines">
-                    <tr id="empty-cart">
-                      <td colspan="5">
-                        <div class="pos-empty-cart">
-                          No items added.<small>Click a product to start a sale.</small>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="pos-cart-summary row">
-                <span class="col-xs-12 col-md-3">Items: <strong id="pos-item-count">0</strong></span>
-                <div class="spacer col-xs-12 col-md-5"></div>
-                <span class="col-xs-12 col-md-4">Subtotal: <strong id="sale-total">MWK 0.00</strong></span>
-              </div>
-            </section>
-
-            <div class="products-selection">
-              <aside class="pos-products-panel">
-              <div class="pos-products-heading">Products</div>
-              <div class="pos-product-grid hide-scrollbar" id="pos-products">
-                {% for item in items %}
-                <button class="pos-product-card" type="button"
-                  data-id="{{ item.id }}"
-                  data-name="{{ item.name }}"
-                  data-barcode="{{ item.barcode or '' }}"
-                  data-retail="{{ item.selling_price_retail }}"
-                  data-wholesale="{{ item.selling_price_wholesale }}"
-                  data-wholesale-threshold="{{ item.wholesale_threshold or 6 }}"
-                  data-stock="{{ item.quantity }}">
-                  <strong>{{ item.name }}</strong>
-                  <small>{{ item.quantity }} in stock</small>
-                  <span>SKU: {{ item.barcode or 'Regular' }}</span>
-                  <b>MWK {{ item.selling_price_retail }}.00</b>
-                </button>
-                {% endfor %}
-              </div>
-            </aside>
-
-            <select id="item-selection" hidden>
-              <option value="">Select an item</option>
-              {% for item in items %}
-              <option value="{{ item.id }}" data-retail="{{ item.selling_price_retail }}" data-wholesale="{{ item.selling_price_wholesale }}" data-wholesale-threshold="{{ item.wholesale_threshold or 6 }}" data-stock="{{ item.quantity }}" data-name="{{ item.name }}">{{ item.name }}</option>
-              {% endfor %}
-            </select>
-            </div>
-            {% if drafts %}
-            <details class="pos-drafts">
-            <summary>Saved sales ({{ drafts|length }})</summary>
-            {% for draft in drafts %}
-            <button type="button" class="resume-sale" data-draft-id="{{ draft.id }}"
-              data-items="{{ draft.line_items|tojson }}"
-              data-customer-id="{{ draft.customer_id or '' }}" data-event-id="{{ draft.event_id or '' }}">
-              Resume #{{ draft.id }} - MWK {{ draft.total }} - {{ draft.created_at }}
-            </button>
+    <div class="pos-shell">
+    <form id="pos-form" class="pos-layout" data-resume-draft-id="{{ resume_draft_id or '' }}">
+      <section class="pos-catalog-panel" aria-label="Product catalog">
+        <div class="pos-catalog-toolbar">
+          <div class="pos-category-tabs" role="group" aria-label="Filter products by category">
+            <button type="button" class="pos-category-tab is-active" data-pos-category="all" aria-pressed="true">All products</button>
+            {% for category in categories %}
+            <button type="button" class="pos-category-tab" data-pos-category="{{ category.id }}" aria-pressed="false">{{ category.name }}</button>
             {% endfor %}
-            </details>
-            {% endif %}
+          </div>
+          <label class="pos-search">
+            <span class="visually-hidden">Search products by name or barcode</span>
+            <input id="pos-search" type="search" autocomplete="off" placeholder="Search products or scan barcode">
+          </label>
         </div>
+        <div class="pos-product-grid hide-scrollbar" id="pos-products">
+          {% for item in items %}
+          <button class="pos-product-card" type="button"
+            data-id="{{ item.id }}"
+            data-name="{{ item.name }}"
+            data-barcode="{{ item.barcode or '' }}"
+            data-category="{{ item.category_id or '' }}"
+            data-retail="{{ item.selling_price_retail }}"
+            data-wholesale="{{ item.selling_price_wholesale }}"
+            data-wholesale-threshold="{{ item.wholesale_threshold or 6 }}"
+            data-stock="{{ item.quantity }}"
+            data-discount="{{ item_discount_percentages.get(item.id, '0') }}">
+            <span class="pos-product-art" aria-hidden="true">{{ item.name[:1]|upper }}</span>
+            <span class="pos-product-details">
+              <strong>{{ item.name }}</strong>
+              <small>{{ item.quantity }} in stock{% if item.barcode %} · {{ item.barcode }}{% endif %}</small>
+              {% if item_discount_percentages.get(item.id, '0')|float > 0 %}
+              <small class="pos-product-discount">{{ item_discount_percentages.get(item.id) }}% item discount</small>
+              {% endif %}
+              <b>MWK {{ item.selling_price_retail }}</b>
+            </span>
+          </button>
+          {% else %}
+          <p class="pos-no-products">No products are available for this sale.</p>
+          {% endfor %}
+        </div>
+        <select id="item-selection" hidden aria-hidden="true" tabindex="-1">
+          <option value="">Select an item</option>
+          {% for item in items %}
+          <option value="{{ item.id }}" data-retail="{{ item.selling_price_retail }}" data-wholesale="{{ item.selling_price_wholesale }}" data-wholesale-threshold="{{ item.wholesale_threshold or 6 }}" data-stock="{{ item.quantity }}" data-discount="{{ item_discount_percentages.get(item.id, '0') }}" data-name="{{ item.name }}">{{ item.name }}</option>
+          {% endfor %}
+        </select>
+      </section>
+
+      <aside class="pos-order-panel" aria-label="Current order">
+        <header class="pos-order-header">
+          <div>
+            <p class="pos-eyebrow">Point of Sale</p>
+            <h1>Current Sale</h1>
+          </div>
+          {% if selected_event %}
+          <span class="pos-event-badge">{{ selected_event.name }}</span>
+          {% else %}
+          <span class="pos-event-badge">Store Sale</span>
+          {% endif %}
+        </header>
+        <div class="pos-order-customer">
+          <label for="pos-customer">Customer</label>
+          <select id="pos-customer" name="customer_id">
+            <option value="">Walk-in customer</option>
+            {% for customer in customers %}
+            <option value="{{ customer.id }}" data-discount="{{ customer_discount_percentages.get(customer.id, '') }}">{{ customer.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <input type="hidden" name="event_id" value="{{ selected_event_id or '' }}">
+        <input type="hidden" name="location" value="store">
+        <div class="pos-cart-table hide-scrollbar">
+          <table data-no-pagination data-no-table-scroll>
+            <thead>
+              <tr><th>Item</th><th>Qty</th><th>Total</th><th><span class="visually-hidden">Remove</span></th></tr>
+            </thead>
+            <tbody id="cart-lines">
+              <tr id="empty-cart"><td colspan="4">
+                <div class="pos-empty-cart">Your sale is empty.<small>Select products to add them here.</small></div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pos-order-summary">
+          <p>Items <strong id="pos-item-count">0</strong></p>
+          <div class="pos-discount-field">
+            <label for="pos-discount-value">Discount</label>
+            <div class="pos-discount-controls">
+              <select id="pos-discount-mode" aria-label="Discount mode">
+                <option value="automatic">Automatic</option>
+                <option value="percentage">Percent</option>
+                <option value="amount">Fixed amount</option>
+              </select>
+              <input id="pos-discount-value" type="number" min="0" step="0.01"
+                inputmode="decimal" placeholder="Assigned rate" disabled>
+            </div>
+            <small id="pos-discount-applied" aria-live="polite"></small>
+          </div>
+          <p>Subtotal <strong id="sale-total">MWK 0.00</strong></p>
+          <p class="pos-grand-total">Total due <strong id="pos-payable-total">MWK 0.00</strong></p>
+        </div>
+        {% if drafts %}
+        <details class="pos-drafts">
+          <summary>Saved sales ({{ drafts|length }})</summary>
+          {% for draft in drafts %}
+          <button type="button" class="resume-sale" data-draft-id="{{ draft.id }}"
+            data-items='{{ draft.line_items|tojson }}'
+            data-customer-id="{{ draft.customer_id or '' }}" data-event-id="{{ draft.event_id or '' }}">
+            Resume #{{ draft.id }} · MWK {{ draft.total }} · {{ draft.created_at }}
+          </button>
+          {% endfor %}
+        </details>
+        {% endif %}
+        <p id="pos-error" role="alert"></p>
+        <footer class="pos-order-actions">
+          <button type="button" id="save-sale" class="pos-save">Save draft</button>
+          <button type="button" id="cancel-sale" class="pos-cancel">Clear sale</button>
+          <div class="pos-payment-actions">
+            <button type="button" id="multiple-pay">Split payment</button>
+            <button type="button" id="card-pay">Card</button>
+            <button type="button" id="cash-pay" class="pos-checkout">Pay cash</button>
+          </div>
+        </footer>
+      </aside>
+
         <input id="item-quantity" type="hidden" value="1">
-        <input id="item-discount" type="hidden" value="0">
         <output id="selected-price" hidden>-</output>
         <button id="add-to-cart" type="button" hidden>Add item</button>
         <input type="number" name="amount_paid" value="0" hidden>
         <select name="payment_method" hidden><option value="">Unpaid</option></select>
-
-        <footer class="pos-actions">
-          <div class="pos-action-buttons">
-            <button type="button" id="cancel-sale" class="pos-cancel">Cancel</button>
-            <button type="button" id="save-sale" class="pos-save">Save Draft</button>
-          </div>
-          <div class="pos-pay-actions">
-            <p>Total <strong id="pos-payable-total">MWK 0.00</strong></p>
-            <button type="button" id="multiple-pay">Multiple Pay</button>
-            <button type="button" id="card-pay">Card</button>
-            <button type="button" id="cash-pay">Cash</button>
-          </div>
-        </footer>
     </form>
+
+    <aside class="pos-quick-toolbar" aria-label="POS quick actions">
+      <details>
+        <summary aria-label="Toggle POS quick actions">Quick actions</summary>
+        <div class="pos-quick-toolbar-content">
+          <button type="button" id="pause-sale-and-exit">Pause sale &amp; return to dashboard</button>
+          <a role="button" href="/dashboard">Return to dashboard</a>
+          <a role="button" href="/sales/returns">Sale return</a>
+          <section aria-labelledby="pos-recent-transactions">
+            <h2 id="pos-recent-transactions">Recent sales</h2>
+            {% for transaction in recent_transactions %}
+            <article class="pos-recent-transaction">
+              <strong>#{{ transaction.id }} · {{ transaction.customer }}</strong>
+              <small>{{ transaction.created_at }} · MWK {{ transaction.total }}</small>
+              <a href="/sales/{{ transaction.id }}/receipt">Reprint receipt</a>
+              <a href="/sales/returns?invoice_id={{ transaction.id }}">Return items</a>
+            </article>
+            {% else %}
+            <p>No recent sales.</p>
+            {% endfor %}
+          </section>
+        </div>
+      </details>
+    </aside>
+    </div>
 
     <dialog id="multiple-payment-dialog">
       <form method="dialog" id="multiple-payment-form">
@@ -124,8 +174,7 @@
       </form>
     </dialog>
 
-    <p id="pos-error" role="alert"></p>
   </main>
-  <script src="{{ url_for('static', path='js/pos.js') }}?v=2"></script>
+  <script src="{{ url_for('static', path='js/pos.js') }}?v=5"></script>
 </body>
 </html>

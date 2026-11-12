@@ -65,6 +65,9 @@
                 </ul>
               </details>
             </li>
+            {% if user.paused_pos_draft_id %}
+            <li><a href="/sales/pos?resume_draft_id={{ user.paused_pos_draft_id }}">Resume POS</a></li>
+            {% endif %}
           </ul>
         </nav>
       </aside>

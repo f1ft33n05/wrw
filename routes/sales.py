@@ -9,11 +9,26 @@ from fastapi.templating import Jinja2Templates
 from starlette import status
 
 from database import db_dependency
-from database_models import Contact, EventStockAllocation, Events, Invoices, Item, ItemDiscount, Payments, SalesTxn, StockMvt, User
+from database_models import (
+    Contact,
+    EventStockAllocation,
+    Events,
+    Invoices,
+    Item,
+    ItemCategory,
+    ItemDiscount,
+    Payments,
+    SalesReturnLines,
+    SalesReturns,
+    SalesTxn,
+    StockMvt,
+    User,
+)
 from models import (
     CheckoutRequest,
     PaymentCollectionRequest,
     Role,
+    SaleReturnRequest,
     SalePaymentResponse,
     SaleTransactionResponse,
 )
@@ -79,6 +94,63 @@ def _active_discount(db, item: Item) -> Decimal:
     return _decimal(discount.percentage, "discount percentage") if discount else Decimal("0")
 
 
+def _active_customer_discount(db, customer_id: int | None) -> Decimal:
+    if customer_id is None:
+        return Decimal("0")
+    discount = (
+        db.query(ItemDiscount)
+        .filter(
+            ItemDiscount.discount_type == "customer",
+            ItemDiscount.target_id == customer_id,
+            ItemDiscount.active == 1,
+        )
+        .order_by(ItemDiscount.id)
+        .first()
+    )
+    return _decimal(discount.percentage, "customer discount") if discount else Decimal("0")
+
+
+def is_pos_draft_invoice(invoice: Invoices) -> bool:
+    try:
+        lines = json.loads(invoice.items or "[]")
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(lines, list) or not lines:
+        return False
+    valid_sale_lines = all(
+        isinstance(line, dict) and "item_id" in line and "quantity" in line
+        for line in lines
+    )
+    return valid_sale_lines and (
+        invoice.document_number is None
+        or all("price_type" in line for line in lines)
+    )
+
+
+def _allocate_discount_to_lines(
+    invoice_lines: list[dict],
+    subtotal: Decimal,
+    discount_amount: Decimal,
+) -> None:
+    remaining_discount = discount_amount
+    for index, line in enumerate(invoice_lines):
+        line_subtotal = _decimal(line["subtotal"], "invoice line subtotal")
+        if index == len(invoice_lines) - 1:
+            line_discount = remaining_discount
+        else:
+            line_discount = _money(discount_amount * line_subtotal / subtotal)
+            line_discount = min(line_discount, remaining_discount, line_subtotal)
+        remaining_discount -= line_discount
+        line_total = _money(line_subtotal - line_discount)
+        quantity = _decimal(line["quantity"], "invoice line quantity")
+        line["discount_amount"] = str(line_discount)
+        line["discount_percentage"] = str(
+            _money(line_discount * Decimal("100") / line_subtotal)
+        )
+        line["total"] = str(line_total)
+        line["unit_price"] = str(_money(line_total / quantity))
+
+
 templates.env.filters["money"] = _format_money
 
 
@@ -127,6 +199,56 @@ def _invoice_status(total: Decimal, paid: Decimal) -> str:
     if paid >= total:
         return "paid"
     return "partially_paid"
+
+
+def _returned_totals(db, sale_txn_ids: set[int]) -> dict[int, tuple[Decimal, Decimal]]:
+    if not sale_txn_ids:
+        return {}
+    totals: dict[int, tuple[Decimal, Decimal]] = {}
+    return_lines = (
+        db.query(SalesReturnLines)
+        .filter(SalesReturnLines.sale_txn_id.in_(sale_txn_ids))
+        .all()
+    )
+    for line in return_lines:
+        quantity, amount = totals.get(line.sale_txn_id, (Decimal("0"), Decimal("0")))
+        totals[line.sale_txn_id] = (
+            quantity + _decimal(line.quantity, "returned quantity"),
+            amount + _decimal(line.refund_amount, "refund amount"),
+        )
+    return totals
+
+
+def _returnable_lines(db, invoice: Invoices) -> list[dict]:
+    sale_lines = (
+        db.query(SalesTxn)
+        .filter(SalesTxn.invoice_id == invoice.id)
+        .order_by(SalesTxn.id)
+        .all()
+    )
+    returned_totals = _returned_totals(db, {line.id for line in sale_lines})
+    item_ids = {line.item_id for line in sale_lines}
+    item_names = {
+        item.id: item.name
+        for item in (db.query(Item).filter(Item.id.in_(item_ids)).all() if item_ids else [])
+    }
+    results = []
+    for sale_line in sale_lines:
+        sold_quantity = _decimal(sale_line.quantity, "sold quantity")
+        sold_total = _decimal(sale_line.total_price, "sale line total")
+        returned_quantity, returned_amount = returned_totals.get(
+            sale_line.id, (Decimal("0"), Decimal("0"))
+        )
+        results.append({
+            "sale_txn_id": sale_line.id,
+            "item_name": item_names.get(sale_line.item_id, f"Item {sale_line.item_id}"),
+            "sold_quantity": sold_quantity,
+            "returned_quantity": returned_quantity,
+            "remaining_quantity": max(sold_quantity - returned_quantity, Decimal("0")),
+            "remaining_refund": max(sold_total - returned_amount, Decimal("0")),
+            "event_id": sale_line.event_id,
+        })
+    return results
 
 
 @router.get(
@@ -404,15 +526,266 @@ async def sales_payments(request: Request, user: user_dependency, db: db_depende
     })
 
 
+@router.get("/returns", response_class=HTMLResponse, dependencies=[SALES_ACCESS])
+async def sales_returns_page(
+    request: Request,
+    user: user_dependency,
+    db: db_dependency,
+    invoice_id: int | None = None,
+):
+    invoices = (
+        db.query(Invoices)
+        .join(SalesTxn, SalesTxn.invoice_id == Invoices.id)
+        .filter(Invoices.status != "draft")
+        .order_by(Invoices.created_at.desc(), Invoices.id.desc())
+        .distinct()
+        .limit(100)
+        .all()
+    )
+    selected_invoice = None
+    lines = []
+    if invoice_id is not None:
+        selected_invoice = (
+            db.query(Invoices)
+            .filter(Invoices.id == invoice_id, Invoices.status != "draft")
+            .first()
+        )
+        if selected_invoice is None:
+            raise HTTPException(status_code=404, detail="Sale not found")
+        lines = _returnable_lines(db, selected_invoice)
+        if not lines:
+            raise HTTPException(status_code=404, detail="Sale has no returnable items")
+    return templates.TemplateResponse(request, "sales_returns.html", {
+        "user": user,
+        "invoices": invoices,
+        "selected_invoice": selected_invoice,
+        "lines": lines,
+    })
+
+
+@router.post(
+    "/returns",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[SALES_ACCESS],
+)
+async def create_sale_return(
+    payload: SaleReturnRequest,
+    db: db_dependency,
+    current_user: user_dependency,
+    request: Request,
+):
+    require_idempotency_key(request)
+    cached = get_cached_response(db, request)
+    if cached:
+        return JSONResponse(status_code=cached[0], content=cached[1])
+
+    return_expired_event_stock(db)
+    try:
+        invoice = (
+            db.query(Invoices)
+            .filter(Invoices.id == payload.invoice_id, Invoices.status != "draft")
+            .with_for_update()
+            .first()
+        )
+        if invoice is None:
+            raise HTTPException(status_code=404, detail="Sale not found")
+
+        sale_lines = (
+            db.query(SalesTxn)
+            .filter(SalesTxn.invoice_id == invoice.id)
+            .with_for_update()
+            .all()
+        )
+        sale_lines_by_id = {line.id: line for line in sale_lines}
+        requested_ids = {line.sale_txn_id for line in payload.items}
+        if not requested_ids.issubset(sale_lines_by_id):
+            raise HTTPException(status_code=422, detail="A selected item does not belong to this sale")
+
+        already_returned = _returned_totals(db, set(sale_lines_by_id))
+        existing_returns = (
+            db.query(SalesReturns)
+            .filter(SalesReturns.invoice_id == invoice.id)
+            .with_for_update()
+            .all()
+        )
+        previously_refunded = sum(
+            (_decimal(record.total_refund, "previous refund") for record in existing_returns),
+            Decimal("0"),
+        )
+        refund_lines = []
+        total_refund = Decimal("0")
+        for requested_line in payload.items:
+            sale_line = sale_lines_by_id[requested_line.sale_txn_id]
+            sold_quantity = _decimal(sale_line.quantity, "sold quantity")
+            sold_total = _decimal(sale_line.total_price, "sale line total")
+            returned_quantity, refunded_amount = already_returned.get(
+                sale_line.id, (Decimal("0"), Decimal("0"))
+            )
+            remaining_quantity = sold_quantity - returned_quantity
+            remaining_amount = sold_total - refunded_amount
+            if requested_line.quantity > remaining_quantity:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Return quantity exceeds the remaining quantity for item {sale_line.item_id}",
+                )
+            refund_amount = (
+                remaining_amount
+                if requested_line.quantity == remaining_quantity
+                else _money(remaining_amount * requested_line.quantity / remaining_quantity)
+            )
+            if refund_amount <= 0:
+                raise HTTPException(status_code=409, detail="This sale line has no refundable amount remaining")
+            refund_lines.append((sale_line, requested_line.quantity, refund_amount))
+            total_refund += refund_amount
+
+        paid_total = _paid_total(db, invoice.id)
+        if total_refund + previously_refunded > paid_total:
+            raise HTTPException(
+                status_code=409,
+                detail="Refund exceeds the amount collected for this sale",
+            )
+
+        timestamp = datetime.now(timezone.utc).isoformat()
+        return_record = SalesReturns(
+            invoice_id=invoice.id,
+            refund_method=payload.refund_method,
+            total_refund=str(_money(total_refund)),
+            processed_by=current_user["id"],
+            created_at=timestamp,
+        )
+        db.add(return_record)
+        db.flush()
+
+        for sale_line, quantity, refund_amount in refund_lines:
+            item = db.query(Item).filter(Item.id == sale_line.item_id).with_for_update().first()
+            if item is None:
+                raise HTTPException(status_code=409, detail=f"Item {sale_line.item_id} no longer exists")
+
+            if sale_line.event_id is not None:
+                event = (
+                    db.query(Events)
+                    .filter(Events.id == sale_line.event_id)
+                    .with_for_update()
+                    .first()
+                )
+                allocation = (
+                    db.query(EventStockAllocation)
+                    .filter(
+                        EventStockAllocation.event_id == sale_line.event_id,
+                        EventStockAllocation.item_id == sale_line.item_id,
+                    )
+                    .with_for_update()
+                    .first()
+                )
+                if event is None or allocation is None:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="The original event stock allocation is unavailable",
+                    )
+                if event.status in {"closed", "cancelled", "archived"} or allocation.status == "returned":
+                    item.quantity = str(_decimal(item.quantity or "0", "item stock") + quantity)
+                else:
+                    allocation.quantity_remaining = str(
+                        _decimal(allocation.quantity_remaining, "event stock")
+                        + quantity
+                    )
+                    allocation.status = "active"
+                    allocation.updated_at = timestamp
+            else:
+                item.quantity = str(_decimal(item.quantity or "0", "item stock") + quantity)
+
+            item.updated_at = timestamp
+            db.add(StockMvt(
+                item_id=item.id,
+                quantity=str(quantity),
+                movement_type="in",
+                note=f"Sale return #{invoice.id}",
+                created_at=timestamp,
+                updated_at=timestamp,
+            ))
+            db.add(SalesReturnLines(
+                return_id=return_record.id,
+                sale_txn_id=sale_line.id,
+                item_id=sale_line.item_id,
+                quantity=str(quantity),
+                refund_amount=str(refund_amount),
+            ))
+
+        response = {
+            "message": "Sale return processed",
+            "return_id": return_record.id,
+            "invoice_id": invoice.id,
+            "refund_amount": str(_money(total_refund)),
+            "refund_method": payload.refund_method,
+        }
+        save_response(db, request, status.HTTP_201_CREATED, response)
+        db.commit()
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=response)
+    except Exception:
+        db.rollback()
+        raise
+
+
 @router.get(
     "/pos",
     response_class=HTMLResponse,
     status_code=status.HTTP_200_OK,
     dependencies=[SALES_ACCESS],
 )
-async def pos_screen(request: Request, user: user_dependency, db: db_dependency, event_id: int | None = None):
+async def pos_screen(
+    request: Request,
+    user: user_dependency,
+    db: db_dependency,
+    event_id: int | None = None,
+    resume_draft_id: int | None = None,
+):
     return_expired_event_stock(db)
-    items = db.query(Item).order_by(Item.name).all()
+    resume_draft = None
+    if resume_draft_id is not None:
+        resume_draft = (
+            db.query(Invoices)
+            .filter(
+                Invoices.id == resume_draft_id,
+                Invoices.created_by == user["id"],
+                Invoices.status == "draft",
+            )
+            .first()
+        )
+        if resume_draft is None or not is_pos_draft_invoice(resume_draft):
+            raise HTTPException(status_code=404, detail="Paused POS sale not found")
+        if event_id is not None and event_id != resume_draft.event_id:
+            raise HTTPException(status_code=409, detail="Paused sale belongs to a different event")
+        event_id = resume_draft.event_id
+
+    catalog_items = db.query(Item).order_by(Item.name).all()
+    items = catalog_items
+    categories = db.query(ItemCategory).order_by(ItemCategory.name).all()
+    active_discounts = (
+        db.query(ItemDiscount)
+        .filter(ItemDiscount.active == 1)
+        .order_by(ItemDiscount.id)
+        .all()
+    )
+    discount_by_target: dict[tuple[str, int], Decimal] = {}
+    for discount in active_discounts:
+        discount_by_target.setdefault(
+            (discount.discount_type, discount.target_id),
+            _decimal(discount.percentage, "discount percentage"),
+        )
+    item_discount_percentages = {
+        item.id: str(
+            discount_by_target.get(
+                ("item", item.id),
+                discount_by_target.get(("category", item.category_id), Decimal("0")),
+            )
+        )
+        for item in items
+    }
+    customer_discount_percentages = {
+        target_id: str(percentage)
+        for (discount_type, target_id), percentage in discount_by_target.items()
+        if discount_type == "customer"
+    }
     if event_id is None:
         items = [
             {**{column.name: getattr(item, column.name) for column in Item.__table__.columns}, "quantity": str(item.quantity or "0")}
@@ -431,6 +804,19 @@ async def pos_screen(request: Request, user: user_dependency, db: db_dependency,
             for item in items
             if item.id in allocation_by_item
         ]
+    if resume_draft is not None:
+        draft_item_ids = {
+            line.get("item_id")
+            for line in json.loads(resume_draft.items or "[]")
+            if isinstance(line, dict)
+        }
+        displayed_item_ids = {item["id"] for item in items}
+        for item in catalog_items:
+            if item.id in draft_item_ids and item.id not in displayed_item_ids:
+                items.append({
+                    **{column.name: getattr(item, column.name) for column in Item.__table__.columns},
+                    "quantity": str(item.quantity or "0") if event_id is None else "0",
+                })
     customers = (
         db.query(Contact)
         .filter(Contact.contact_type == "customer")
@@ -443,6 +829,15 @@ async def pos_screen(request: Request, user: user_dependency, db: db_dependency,
         .order_by(Events.starts_at.desc(), Events.name)
         .all()
     )
+    draft_invoices = (
+        db.query(Invoices)
+        .filter(
+            Invoices.status == "draft",
+            Invoices.created_by == user["id"],
+        )
+        .order_by(Invoices.id.desc())
+        .all()
+    )
     drafts = [
         {
             "id": invoice.id,
@@ -452,7 +847,8 @@ async def pos_screen(request: Request, user: user_dependency, db: db_dependency,
             "event_id": invoice.event_id,
             "created_at": _display_timestamp(invoice.created_at),
         }
-        for invoice in db.query(Invoices).filter(Invoices.status == "draft").order_by(Invoices.id.desc()).all()
+        for invoice in draft_invoices
+        if is_pos_draft_invoice(invoice)
     ]
     if event_id is not None:
         selected_event = db.query(Events).filter(Events.id == event_id).first()
@@ -460,16 +856,56 @@ async def pos_screen(request: Request, user: user_dependency, db: db_dependency,
             raise HTTPException(status_code=404, detail="Event not found")
         if not _event_starts_on(selected_event.starts_at, datetime.now(APP_TIMEZONE).date()):
             raise HTTPException(status_code=409, detail="Event POS opens on the event start date")
+    else:
+        selected_event = None
+    recent_invoices = (
+        db.query(Invoices)
+        .join(SalesTxn, SalesTxn.invoice_id == Invoices.id)
+        .filter(Invoices.status != "draft")
+        .order_by(Invoices.created_at.desc(), Invoices.id.desc())
+        .distinct()
+        .limit(10)
+        .all()
+    )
+    recent_customer_ids = {
+        invoice.customer_id
+        for invoice in recent_invoices
+        if invoice.customer_id is not None
+    }
+    recent_customers = {
+        customer.id: customer.name
+        for customer in (
+            db.query(Contact).filter(Contact.id.in_(recent_customer_ids)).all()
+            if recent_customer_ids
+            else []
+        )
+    }
+    recent_transactions = [
+        {
+            "id": invoice.id,
+            "customer": recent_customers.get(invoice.customer_id, "Walk-in customer"),
+            "created_at": _display_timestamp(invoice.created_at),
+            "total": _decimal(invoice.total_price, "invoice total"),
+            "status": invoice.status,
+        }
+        for invoice in recent_invoices
+    ]
     return templates.TemplateResponse(
         request,
         "pos.html",
         {
             "user": user,
             "items": items,
+            "categories": categories,
+            "item_discount_percentages": item_discount_percentages,
+            "customer_discount_percentages": customer_discount_percentages,
             "customers": customers,
             "events": events,
             "drafts": drafts,
+            "resume_draft_id": resume_draft.id if resume_draft is not None else None,
+            "recent_transactions": recent_transactions,
             "selected_event_id": event_id,
+            "selected_event": selected_event,
         },
     )
 
@@ -555,8 +991,9 @@ async def create_sale(
                     detail="Customer not found",
                 )
 
+        customer_discount = _active_customer_discount(db, checkout.customer_id)
         invoice_lines = []
-        total = Decimal("0")
+        subtotal = Decimal("0")
         for item_id, quantity in quantities.items():
             item = items_by_id[item_id]
             stock = _decimal(item.quantity or "0", "stock quantity")
@@ -613,11 +1050,6 @@ async def create_sale(
             )
             discount_amount = _money(undiscounted_total * discount_percentage / Decimal("100"))
             line_total = _money(undiscounted_total - discount_amount)
-            if line_total <= 0:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Quantity for {item.name} is too small to produce a sale amount",
-                )
             unit_price = _money(line_total / quantity)
             price_type = (
                 "mixed"
@@ -626,7 +1058,7 @@ async def create_sale(
                 if wholesale_quantity
                 else "retail"
             )
-            total += line_total
+            subtotal += undiscounted_total
             invoice_lines.append(
                 {
                     "item_id": item.id,
@@ -635,6 +1067,7 @@ async def create_sale(
                     "quantity": str(quantity),
                     "unit_price": str(unit_price),
                     "total": str(line_total),
+                    "subtotal": str(undiscounted_total),
                     "discount_percentage": str(discount_percentage),
                     "discount_amount": str(discount_amount),
                     "price_type": price_type,
@@ -648,7 +1081,69 @@ async def create_sale(
                     ),
                 }
             )
-        total = _money(total)
+        subtotal = _money(subtotal)
+        customer_discount_applies = (
+            checkout.discount_mode == "automatic" and customer_discount > 0
+        )
+        sale_discount_applies = (
+            checkout.discount_mode != "automatic" or customer_discount_applies
+        )
+        if sale_discount_applies:
+            if checkout.discount_mode == "percentage":
+                sale_discount_amount = _money(
+                    subtotal * checkout.discount_value / Decimal("100")
+                )
+            elif checkout.discount_mode == "amount":
+                if checkout.discount_value > subtotal:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail="Discount cannot exceed the sale subtotal",
+                    )
+                sale_discount_amount = _money(checkout.discount_value)
+            else:
+                sale_discount_amount = _money(
+                    subtotal * customer_discount / Decimal("100")
+                )
+            _allocate_discount_to_lines(
+                invoice_lines,
+                subtotal,
+                sale_discount_amount,
+            )
+            total_discount = sale_discount_amount
+            total = _money(subtotal - total_discount)
+        else:
+            if any(
+                _decimal(line["total"], "invoice line total") <= 0
+                for line in invoice_lines
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="A discount cannot reduce an item total to zero",
+                )
+            total = _money(
+                sum(
+                    (_decimal(line["total"], "invoice line total") for line in invoice_lines),
+                    Decimal("0"),
+                )
+            )
+            total_discount = _money(
+                sum(
+                    (_decimal(line["discount_amount"], "line discount amount") for line in invoice_lines),
+                    Decimal("0"),
+                )
+            )
+        if total <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Discount cannot reduce the sale total to zero",
+            )
+        for line in invoice_lines:
+            line["sale_discount_mode"] = checkout.discount_mode
+            line["sale_discount_value"] = (
+                str(checkout.discount_value)
+                if checkout.discount_value is not None
+                else None
+            )
         amount_paid = min(tendered_amount, total)
         change_amount = tendered_amount - amount_paid
 
@@ -658,6 +1153,8 @@ async def create_sale(
             event_id=checkout.event_id,
             created_by=current_user["id"],
             items=json.dumps(invoice_lines),
+            subtotal=str(subtotal),
+            discount_amount=str(total_discount),
             total_price=str(total),
             status="draft" if checkout.save_draft else _invoice_status(total, amount_paid),
             created_at=timestamp,
@@ -757,9 +1254,21 @@ async def create_sale(
     status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[SALES_ACCESS],
 )
-async def delete_draft(invoice_id: int, db: db_dependency):
-    invoice = db.query(Invoices).filter(Invoices.id == invoice_id, Invoices.status == "draft").first()
-    if invoice is None:
+async def delete_draft(
+    invoice_id: int,
+    db: db_dependency,
+    current_user: user_dependency,
+):
+    invoice = (
+        db.query(Invoices)
+        .filter(
+            Invoices.id == invoice_id,
+            Invoices.status == "draft",
+            Invoices.created_by == current_user["id"],
+        )
+        .first()
+    )
+    if invoice is None or not is_pos_draft_invoice(invoice):
         raise HTTPException(status_code=404, detail="Draft sale not found")
     db.delete(invoice)
     db.commit()
@@ -901,19 +1410,33 @@ async def receipt(
     for sale in sales:
         snapshot = invoice_line_by_item.get(sale.item_id, {})
         current_item = item_by_id.get(sale.item_id)
-        price_segments = []
-        wholesale_quantity = snapshot.get("wholesale_quantity")
-        retail_quantity = snapshot.get("retail_quantity")
-        if wholesale_quantity is not None and Decimal(wholesale_quantity) > 0:
-            price_segments.append(
-                f'{_compact_decimal(wholesale_quantity, "wholesale quantity")} @ '
-                f'{CURRENCY_CODE} {_compact_decimal(snapshot["wholesale_unit_price"], "wholesale price")}'
-            )
-        if retail_quantity is not None and Decimal(retail_quantity) > 0:
-            price_segments.append(
-                f'{_compact_decimal(retail_quantity, "retail quantity")} @ '
-                f'{CURRENCY_CODE} {_compact_decimal(snapshot["retail_unit_price"], "retail price")}'
-            )
+        unit_prices = []
+        wholesale_quantity = _decimal(
+            snapshot.get("wholesale_quantity", "0"),
+            "wholesale quantity",
+        )
+        retail_quantity = _decimal(
+            snapshot.get("retail_quantity", "0"),
+            "retail quantity",
+        )
+        if wholesale_quantity > 0 and snapshot.get("wholesale_unit_price") is not None:
+            unit_prices.append({
+                "quantity": wholesale_quantity,
+                "price_type": "wholesale",
+                "unit_price": snapshot["wholesale_unit_price"],
+            })
+        if retail_quantity > 0 and snapshot.get("retail_unit_price") is not None:
+            unit_prices.append({
+                "quantity": retail_quantity,
+                "price_type": "retail",
+                "unit_price": snapshot["retail_unit_price"],
+            })
+        if not unit_prices:
+            unit_prices.append({
+                "quantity": _decimal(sale.quantity, "sold quantity"),
+                "price_type": sale.price_type or "unit",
+                "unit_price": sale.unit_price or "0.00",
+            })
         lines.append(
             {
                 "name": snapshot.get(
@@ -925,17 +1448,8 @@ async def receipt(
                     snapshot.get("name", current_item.name if current_item is not None else "Item"),
                 ),
                 "quantity": sale.quantity,
-                "unit_prices": snapshot.get(
-                    "unit_prices",
-                    _compact_decimal(sale.unit_price or "0.00", "unit price"),
-                ).replace(f"{CURRENCY_CODE} ", ""),
+                "unit_prices": unit_prices,
                 "total": sale.total_price,
-                "price_breakdown": (
-                    "; ".join(price_segments)
-                    or snapshot.get("price_type")
-                    or sale.price_type
-                    or "Standard price"
-                ),
             }
         )
     return templates.TemplateResponse(

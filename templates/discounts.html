@@ -16,6 +16,7 @@
                       <select name="discount_type" id="discount-type">
                         <option value="item">Item</option>
                         <option value="category">Category</option>
+                        <option value="customer">Customer</option>
                       </select>
                     </label>
                     <label id="item-target">Item
@@ -26,6 +27,11 @@
                     <label id="category-target" hidden>Category
                       <select name="category_target_id" disabled>
                         {% for category in categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}
+                      </select>
+                    </label>
+                    <label id="customer-target" hidden>Customer
+                      <select name="customer_target_id" disabled>
+                        {% for customer in customers %}<option value="{{ customer.id }}">{{ customer.name }}</option>{% endfor %}
                       </select>
                     </label>
                     <label>Percentage <input name="percentage" type="number" step="0.01" min="0.01" max="100" required></label>
@@ -41,7 +47,15 @@
             {% for discount in discounts %}
             <tr>
               <td>{{ discount.name }}</td><td>{{ discount.discount_type|title }}</td>
-              <td>{{ item_names.get(discount.target_id, "") if discount.discount_type == "item" else category_names.get(discount.target_id, "") }}</td>
+              <td>
+                {% if discount.discount_type == "item" %}
+                {{ item_names.get(discount.target_id, "") }}
+                {% elif discount.discount_type == "customer" %}
+                {{ customer_names.get(discount.target_id, "") }}
+                {% else %}
+                {{ category_names.get(discount.target_id, "") }}
+                {% endif %}
+              </td>
               <td>{{ discount.percentage }}%</td><td>{{ "Yes" if discount.active else "No" }}</td>
             </tr>
             {% else %}
@@ -52,6 +66,6 @@
       </main>
       </div>
   </div>
-<script src="{{ url_for('static', path='js/discounts.js') }}"></script>
+<script src="{{ url_for('static', path='js/discounts.js') }}?v=2"></script>
 </body>
 </html>

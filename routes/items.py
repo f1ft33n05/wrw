@@ -11,6 +11,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
 from starlette import status
 from database_models import (
+    Contact,
     Item,
     ItemCategory,
     ItemDiscount,
@@ -213,13 +214,21 @@ async def discounts_page(request: Request, user: user_dependency, db: db_depende
     discounts = db.query(ItemDiscount).order_by(ItemDiscount.name).all()
     categories = db.query(ItemCategory).order_by(ItemCategory.name).all()
     items = db.query(Item).order_by(Item.name).all()
+    customers = (
+        db.query(Contact)
+        .filter(Contact.contact_type == "customer")
+        .order_by(Contact.name)
+        .all()
+    )
     return templates.TemplateResponse(request, "discounts.html", {
         "user": user,
         "discounts": discounts,
         "categories": categories,
         "items": items,
+        "customers": customers,
         "category_names": {category.id: category.name for category in categories},
         "item_names": {item.id: item.name for item in items},
+        "customer_names": {customer.id: customer.name for customer in customers},
     })
 
 
@@ -260,7 +269,19 @@ async def delete_category(category_id: int, db: db_dependency):
 
 @router.post("/discounts", status_code=201, dependencies=[MANAGEMENT_ACCESS])
 async def create_discount(payload: DiscountRequest, db: db_dependency):
-    target = db.query(Item if payload.discount_type == "item" else ItemCategory).filter((Item.id if payload.discount_type == "item" else ItemCategory.id) == payload.target_id).first()
+    if payload.discount_type == "item":
+        target = db.query(Item).filter(Item.id == payload.target_id).first()
+    elif payload.discount_type == "category":
+        target = db.query(ItemCategory).filter(ItemCategory.id == payload.target_id).first()
+    else:
+        target = (
+            db.query(Contact)
+            .filter(
+                Contact.id == payload.target_id,
+                Contact.contact_type == "customer",
+            )
+            .first()
+        )
     if not target:
         raise HTTPException(status_code=404, detail="Discount target not found")
     timestamp = datetime.now(timezone.utc).isoformat()

@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from enum import Enum
 from decimal import Decimal
 from typing import Literal
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from config import CURRENCY_CODE
 
 class Role(str, Enum):
@@ -204,7 +204,7 @@ class CategoryRequest(BaseModel):
 class DiscountRequest(BaseModel):
     id: int | None = None
     name: str = Field(min_length=1)
-    discount_type: Literal["item", "category"]
+    discount_type: Literal["item", "category", "customer"]
     target_id: int
     percentage: Decimal = Field(gt=0, le=100)
     active: bool = True
@@ -229,6 +229,8 @@ class CheckoutRequest(BaseModel):
     items: list[SaleLineRequest] = Field(min_length=1)
     amount_paid: Decimal = Field(ge=0)
     payment_method: str | None = None
+    discount_mode: Literal["automatic", "percentage", "amount"] = "automatic"
+    discount_value: Decimal | None = Field(default=None, ge=0)
     save_draft: bool = False
 
     @field_validator("amount_paid")
@@ -237,6 +239,56 @@ class CheckoutRequest(BaseModel):
         if not value.is_finite():
             raise ValueError("Amount paid must be finite")
         return value
+
+    @field_validator("discount_value")
+    @classmethod
+    def discount_value_must_be_finite(cls, value: Decimal | None) -> Decimal | None:
+        if value is not None and not value.is_finite():
+            raise ValueError("Discount value must be finite")
+        return value
+
+    @model_validator(mode="after")
+    def validate_discount(self):
+        if self.discount_mode == "automatic" and self.discount_value is not None:
+            raise ValueError("Automatic discounts do not accept a manual value")
+        if self.discount_mode != "automatic" and self.discount_value is None:
+            raise ValueError("Enter a value for the selected discount mode")
+        if self.discount_mode == "percentage" and self.discount_value > 100:
+            raise ValueError("Discount percentage cannot exceed 100")
+        return self
+
+
+class SaleReturnLineRequest(BaseModel):
+    sale_txn_id: int
+    quantity: Decimal = Field(gt=0)
+
+    @field_validator("quantity")
+    @classmethod
+    def quantity_must_be_finite(cls, value: Decimal) -> Decimal:
+        if not value.is_finite():
+            raise ValueError("Return quantity must be finite")
+        return value
+
+
+class SaleReturnRequest(BaseModel):
+    invoice_id: int
+    refund_method: str = Field(min_length=1)
+    items: list[SaleReturnLineRequest] = Field(min_length=1)
+
+    @field_validator("refund_method")
+    @classmethod
+    def refund_method_must_be_supported(cls, value: str) -> str:
+        method = value.strip().lower()
+        if method not in {"cash", "card", "mobile money", "bank transfer"}:
+            raise ValueError("Unsupported refund method")
+        return method
+
+    @model_validator(mode="after")
+    def each_sale_line_must_be_unique(self):
+        sale_txn_ids = [line.sale_txn_id for line in self.items]
+        if len(set(sale_txn_ids)) != len(sale_txn_ids):
+            raise ValueError("Each sale line can only be returned once")
+        return self
 
 
 class EventRequest(BaseModel):

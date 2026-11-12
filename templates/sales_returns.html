@@ -1,0 +1,67 @@
+{% include "header.html" %}
+<body>
+  {% include "navbar.html" %}
+  <div class="content-container row">
+    {% include "sidebar.html" %}
+    <main class="col-xs-12 col-md-9 sales-returns-page">
+      <h1>Sale returns</h1>
+      <p>Choose a completed sale, select the quantities being returned, and record the refund method.</p>
+      <label for="return-invoice">Sale</label>
+      <select id="return-invoice">
+        <option value="">Select a sale</option>
+        {% for invoice in invoices %}
+        <option value="{{ invoice.id }}" {% if selected_invoice and selected_invoice.id == invoice.id %}selected{% endif %}>
+          {{ invoice.document_number or ("Sale #" ~ invoice.id) }} · {{ invoice.created_at }} · MWK {{ invoice.total_price }}
+        </option>
+        {% endfor %}
+      </select>
+
+      {% if selected_invoice %}
+      <form id="sale-return-form" data-invoice-id="{{ selected_invoice.id }}">
+        <h2>Sale #{{ selected_invoice.id }}</h2>
+        <div class="table-scroll-container">
+          <table>
+            <thead>
+              <tr><th>Item</th><th>Sold</th><th>Already returned</th><th>Available to return</th><th>Return quantity</th></tr>
+            </thead>
+            <tbody>
+              {% for line in lines %}
+              <tr>
+                <td>{{ line.item_name }}</td>
+                <td>{{ line.sold_quantity }}</td>
+                <td>{{ line.returned_quantity }}</td>
+                <td>{{ line.remaining_quantity }}</td>
+                <td>
+                  {% if line.remaining_quantity > 0 %}
+                  <input class="sale-return-quantity" type="number" min="0" max="{{ line.remaining_quantity }}"
+                    step="0.01" value="0" data-sale-txn-id="{{ line.sale_txn_id }}"
+                    data-remaining="{{ line.remaining_quantity }}" data-refund="{{ line.remaining_refund }}"
+                    aria-label="Quantity of {{ line.item_name }} to return">
+                  {% else %}
+                  Fully returned
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <label for="refund-method">Refund method</label>
+        <select id="refund-method" required>
+          <option value="cash">Cash</option>
+          <option value="card">Card</option>
+          <option value="mobile money">Mobile money</option>
+          <option value="bank transfer">Bank transfer</option>
+        </select>
+        <p>Estimated refund: <strong id="return-estimate">MWK 0.00</strong></p>
+        <p id="sale-return-error" role="alert"></p>
+        <button type="submit" id="process-sale-return">Process return</button>
+      </form>
+      {% elif not invoices %}
+      <p>No completed sales are available to return.</p>
+      {% endif %}
+    </main>
+  </div>
+  <script src="{{ url_for('static', path='js/sales-returns.js') }}" defer></script>
+</body>
+</html>

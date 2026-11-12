@@ -39,7 +39,7 @@ function addProductCardToCart(card) {
             unitPrices: pricing.unitPrices,
             priceBreakdown: pricing.priceBreakdown,
             lineTotal: pricing.lineTotal,
-            discountPercentage: 0,
+            discountPercentage: Number(card.dataset.discount || 0),
         });
         posError.textContent = "";
         renderCart();
@@ -51,6 +51,31 @@ document.querySelectorAll(".pos-product-card").forEach((card) => {
 
 const productSearch = document.querySelector("#pos-search");
 const productCards = [...document.querySelectorAll(".pos-product-card")];
+const categoryTabs = [...document.querySelectorAll("[data-pos-category]")];
+let activeCategory = "all";
+
+function filterProducts() {
+    const query = productSearch.value.trim().toLowerCase();
+    productCards.forEach((card) => {
+        const matchesCategory = activeCategory === "all" || card.dataset.category === activeCategory;
+        const matchesSearch = !query
+            || card.dataset.name.toLowerCase().includes(query)
+            || card.dataset.barcode.toLowerCase().includes(query);
+        card.hidden = !matchesCategory || !matchesSearch;
+    });
+}
+
+categoryTabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+        activeCategory = tab.dataset.posCategory;
+        categoryTabs.forEach((categoryTab) => {
+            const isActive = categoryTab === tab;
+            categoryTab.classList.toggle("is-active", isActive);
+            categoryTab.setAttribute("aria-pressed", String(isActive));
+        });
+        filterProducts();
+    });
+});
 
 function findProductFromSearch(value) {
     const query = value.trim().toLowerCase();
@@ -66,13 +91,7 @@ function findProductFromSearch(value) {
 }
 
 productSearch?.addEventListener("input", (event) => {
-    const query = event.target.value.trim().toLowerCase();
-    productCards.forEach((card) => {
-        const matches = !query
-            || card.dataset.name.toLowerCase().includes(query)
-            || card.dataset.barcode.toLowerCase().includes(query);
-        card.hidden = !matches;
-    });
+    filterProducts();
 });
 
 productSearch?.addEventListener("change", (event) => {
@@ -87,7 +106,7 @@ productSearch?.addEventListener("keydown", (event) => {
     if (card) {
         addProductCardToCart(card);
         event.currentTarget.value = "";
-        productCards.forEach((productCard) => { productCard.hidden = false; });
+        filterProducts();
     }
 });
 
@@ -111,7 +130,7 @@ function formatMoney(value) {
     }).format(value)}`;
 }
 
-function priceForQuantity(option, quantity) {
+function priceForQuantity(option, quantity, discountPercentage = null) {
     const threshold = Number(option.dataset.wholesaleThreshold);
     const thresholdIsValid = Number.isFinite(threshold) && threshold > 0;
     const wholesaleQuantity = thresholdIsValid
@@ -123,7 +142,9 @@ function priceForQuantity(option, quantity) {
     const lineTotal =
         retailQuantity * (retailQuantity > 0 ? retailPrice : 0)
         + wholesaleQuantity * (wholesaleQuantity > 0 ? wholesalePrice : 0);
-    const requestedDiscount = Number(document.querySelector("#item-discount")?.value || option.dataset.discount || 0);
+    const requestedDiscount = discountPercentage === null
+        ? Number(option.dataset.discount || 0)
+        : discountPercentage;
     const safeDiscount = Number.isFinite(requestedDiscount) ? Math.min(Math.max(requestedDiscount, 0), 100) : 0;
     const discountedLineTotal = lineTotal * (1 - safeDiscount / 100);
     const roundedLineTotal = Math.round((discountedLineTotal + Number.EPSILON) * 100) / 100;
@@ -149,6 +170,132 @@ function priceForQuantity(option, quantity) {
     };
 }
 
+const discountMode = document.querySelector("#pos-discount-mode");
+const discountValue = document.querySelector("#pos-discount-value");
+const customerSelect = document.querySelector("#pos-customer");
+let previousDiscountMode = discountMode.value;
+
+function syncDiscountControl() {
+    const assignedCustomerDiscount = Number(
+        customerSelect.selectedOptions[0]?.dataset.discount || 0,
+    );
+    const automatic = discountMode.value === "automatic";
+    discountValue.disabled = automatic;
+    if (automatic) {
+        discountValue.value = assignedCustomerDiscount > 0
+            ? String(assignedCustomerDiscount)
+            : "";
+        discountValue.placeholder = assignedCustomerDiscount > 0
+            ? "Customer rate"
+            : "Item discounts apply";
+    } else {
+        discountValue.placeholder = discountMode.value === "amount"
+            ? "MWK amount"
+            : "Discount %";
+    }
+}
+
+discountMode.addEventListener("change", () => {
+    if (
+        (discountMode.value === "amount" && previousDiscountMode !== "amount")
+        || (discountMode.value === "percentage" && previousDiscountMode === "amount")
+    ) {
+        discountValue.value = "";
+    }
+    previousDiscountMode = discountMode.value;
+    syncDiscountControl();
+    renderCart();
+});
+discountValue.addEventListener("input", () => {
+    posError.textContent = "";
+    renderCart();
+});
+customerSelect.addEventListener("change", () => {
+    if (discountMode.value === "automatic") syncDiscountControl();
+    renderCart();
+});
+
+function selectedDiscount() {
+    const mode = discountMode.value;
+    const value = Number(discountValue.value);
+    if (mode !== "automatic" && discountValue.value !== "" && Number.isFinite(value)) {
+        return { mode, value };
+    }
+    const customerRate = Number(customerSelect.selectedOptions[0]?.dataset.discount || 0);
+    if (customerRate > 0) return { mode: "percentage", value: customerRate };
+    return { mode: "automatic", value: 0 };
+}
+
+function checkoutDiscountFields() {
+    const value = discountValue.value;
+    if (discountMode.value === "automatic" || value === "") {
+        return { discount_mode: "automatic", discount_value: null };
+    }
+    return {
+        discount_mode: discountMode.value,
+        discount_value: Number(value),
+    };
+}
+
+function calculateCartTotals() {
+    const lines = [...cart.entries()].map(([itemId, line]) => {
+        const option = itemSelection.querySelector(`option[value="${itemId}"]`);
+        const basePrice = priceForQuantity(option, line.quantity, 0).lineTotal;
+        const automaticPrice = priceForQuantity(
+            option,
+            line.quantity,
+            Number(option.dataset.discount || 0),
+        ).lineTotal;
+        return { line, basePrice, automaticPrice };
+    });
+    const subtotal = lines.reduce((sum, item) => sum + item.basePrice, 0);
+    const selection = selectedDiscount();
+    const useSaleWideDiscount = selection.mode !== "automatic";
+
+    if (useSaleWideDiscount) {
+        const discountAmount = selection.mode === "percentage"
+            ? Math.round((subtotal * selection.value / 100 + Number.EPSILON) * 100) / 100
+            : Math.min(selection.value, subtotal);
+        let remainingDiscount = discountAmount;
+        lines.forEach((item, index) => {
+            const lineDiscount = index === lines.length - 1
+                ? remainingDiscount
+                : Math.min(
+                    Math.round((discountAmount * item.basePrice / subtotal + Number.EPSILON) * 100) / 100,
+                    remainingDiscount,
+                    item.basePrice,
+                );
+            remainingDiscount -= lineDiscount;
+            item.line.lineTotal = Math.round((item.basePrice - lineDiscount + Number.EPSILON) * 100) / 100;
+            item.line.discountPercentage = item.basePrice > 0
+                ? Math.round((lineDiscount * 100 / item.basePrice + Number.EPSILON) * 100) / 100
+                : 0;
+        });
+        return {
+            subtotal,
+            discountAmount,
+            total: Math.round((subtotal - discountAmount + Number.EPSILON) * 100) / 100,
+        };
+    }
+
+    let total = 0;
+    let discountAmount = 0;
+    lines.forEach((item) => {
+        item.line.lineTotal = item.automaticPrice;
+        const lineDiscount = Math.round((item.basePrice - item.automaticPrice + Number.EPSILON) * 100) / 100;
+        item.line.discountPercentage = item.basePrice > 0
+            ? Math.round((lineDiscount * 100 / item.basePrice + Number.EPSILON) * 100) / 100
+            : 0;
+        discountAmount += lineDiscount;
+        total += item.automaticPrice;
+    });
+    return {
+        subtotal,
+        discountAmount: Math.round((discountAmount + Number.EPSILON) * 100) / 100,
+        total: Math.round((total + Number.EPSILON) * 100) / 100,
+    };
+}
+
 function updateSelectedPrice() {
     const option = itemSelection.selectedOptions[0];
     const quantity = Number(quantityInput.value) +
@@ -163,33 +310,63 @@ function updateSelectedPrice() {
 
 function renderCart() {
     cartBody.replaceChildren();
-    let total = 0;
-    // if (cart.size === 0) {
-    //     const row = document.createElement("tr");
-    //     const cell = document.createElement("td");
-    //     cell.colSpan = 6;
-    //     cell.textContent = "No items added.";
-    //     row.append(cell);
-    //     cartBody.append(row);
-    // }
+    const totals = calculateCartTotals();
+    if (cart.size === 0) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 4;
+        const emptyState = document.createElement("div");
+        emptyState.className = "pos-empty-cart";
+        emptyState.append("Your sale is empty.");
+        const hint = document.createElement("small");
+        hint.textContent = "Select products to add them here.";
+        emptyState.append(hint);
+        cell.append(emptyState);
+        row.append(cell);
+        cartBody.append(row);
+    }
 
     for (const [itemId, line] of cart) {
         const row = document.createElement("tr");
-        for (const value of [
-            line.name,
-            String(line.quantity),
-            line.priceBreakdown,
-            line.unitPrices,
-            formatMoney(line.lineTotal),
-        ]) {
-            const cell = document.createElement("td");
-            cell.textContent = value;
-            row.append(cell);
-        }
+        const nameCell = document.createElement("td");
+        const name = document.createElement("strong");
+        name.textContent = line.name;
+        const priceInfo = document.createElement("small");
+        priceInfo.textContent = line.discountPercentage > 0
+            ? `${compactNumber(line.discountPercentage)}% discount · ${line.priceBreakdown}`
+            : line.priceBreakdown;
+        nameCell.append(name, priceInfo);
+        row.append(nameCell);
+
+        const quantityCell = document.createElement("td");
+        const quantityControls = document.createElement("div");
+        quantityControls.className = "pos-quantity-controls";
+        const decrementButton = document.createElement("button");
+        decrementButton.type = "button";
+        decrementButton.textContent = "−";
+        decrementButton.setAttribute("aria-label", `Remove one ${line.name}`);
+        decrementButton.addEventListener("click", () => updateCartQuantity(itemId, -1));
+        const quantity = document.createElement("span");
+        quantity.textContent = compactNumber(line.quantity);
+        const incrementButton = document.createElement("button");
+        incrementButton.type = "button";
+        incrementButton.textContent = "+";
+        incrementButton.setAttribute("aria-label", `Add one ${line.name}`);
+        incrementButton.addEventListener("click", () => updateCartQuantity(itemId, 1));
+        quantityControls.append(decrementButton, quantity, incrementButton);
+        quantityCell.append(quantityControls);
+        row.append(quantityCell);
+
+        const totalCell = document.createElement("td");
+        totalCell.textContent = formatMoney(line.lineTotal);
+        row.append(totalCell);
+
         const actionCell = document.createElement("td");
         const removeButton = document.createElement("button");
         removeButton.type = "button";
-        removeButton.textContent = "Remove";
+        removeButton.className = "pos-remove-item";
+        removeButton.textContent = "×";
+        removeButton.setAttribute("aria-label", `Remove ${line.name} from sale`);
         removeButton.addEventListener("click", () => {
             cart.delete(itemId);
             renderCart();
@@ -197,15 +374,45 @@ function renderCart() {
         actionCell.append(removeButton);
         row.append(actionCell);
         cartBody.append(row);
-        total += line.lineTotal;
     }
-    document.querySelector("#sale-total").textContent = formatMoney(total);
-    document.querySelector("#pos-payable-total")?.replaceChildren(formatMoney(total));
+    document.querySelector("#sale-total").textContent = formatMoney(totals.subtotal);
+    document.querySelector("#pos-payable-total")?.replaceChildren(formatMoney(totals.total));
+    document.querySelector("#pos-discount-applied").textContent =
+        totals.discountAmount > 0 ? `Applied: ${formatMoney(totals.discountAmount)}` : "";
     const itemCount = [...cart.values()].reduce((sum, line) => sum + line.quantity, 0);
     const count = document.querySelector("#pos-item-count");
     if (count) count.textContent = compactNumber(itemCount);
     const tendered = Number(new FormData(posForm).get("amount_paid")) || 0;
-    document.querySelector("#sale-change")?.replaceChildren(formatMoney(Math.max(tendered - total, 0)));
+    document.querySelector("#sale-change")?.replaceChildren(formatMoney(Math.max(tendered - totals.total, 0)));
+}
+
+function updateCartQuantity(itemId, difference) {
+    const line = cart.get(itemId);
+    const option = itemSelection.querySelector(`option[value="${itemId}"]`);
+    if (!line || !option) return;
+
+    const quantity = line.quantity + difference;
+    if (quantity <= 0) {
+        cart.delete(itemId);
+        renderCart();
+        return;
+    }
+    if (quantity > Number(option.dataset.stock)) {
+        posError.textContent = `Only ${option.dataset.stock} unit(s) are in stock.`;
+        return;
+    }
+
+    const pricing = priceForQuantity(option, quantity);
+    if (!Number.isFinite(pricing.totalUnitPrice) || pricing.totalUnitPrice <= 0) {
+        posError.textContent = `${line.name} has no valid price.`;
+        return;
+    }
+    line.quantity = quantity;
+    line.unitPrices = pricing.unitPrices;
+    line.priceBreakdown = pricing.priceBreakdown;
+    line.lineTotal = pricing.lineTotal;
+    posError.textContent = "";
+    renderCart();
 }
 
 itemSelection.addEventListener("change", async () => {
@@ -219,7 +426,6 @@ itemSelection.addEventListener("change", async () => {
     updateSelectedPrice();
 });
 quantityInput.addEventListener("input", updateSelectedPrice);
-document.querySelector("#item-discount").addEventListener("input", updateSelectedPrice);
 
 document.querySelector("#add-to-cart").addEventListener("click", () => {
     posError.textContent = "";
@@ -248,7 +454,7 @@ document.querySelector("#add-to-cart").addEventListener("click", () => {
         unitPrices: pricing.unitPrices,
         priceBreakdown: pricing.priceBreakdown,
         lineTotal: pricing.lineTotal,
-            discountPercentage: Number(document.querySelector("#item-discount").value || option.dataset.discount || 0),
+        discountPercentage: Number(option.dataset.discount || 0),
         });
     renderCart();
 });
@@ -261,15 +467,31 @@ async function checkoutSale(paymentMethod, payments = null) {
     }
 
     const button = document.querySelector("#complete-sale") || document.querySelector("#cash-pay");
-    button.disabled = true;
     const formData = new FormData(posForm);
     const customerId = formData.get("customer_id");
     const eventId = formData.get("event_id");
     const amountPaidInput = posForm.elements.namedItem("amount_paid");
-    const total = [...cart.values()].reduce(
-        (sum, line) => sum + line.lineTotal,
-        0,
-    );
+    const totals = calculateCartTotals();
+    const discountFields = checkoutDiscountFields();
+    if (
+        discountFields.discount_mode === "percentage"
+        && discountFields.discount_value > 100
+    ) {
+        posError.textContent = "Discount percentage cannot exceed 100.";
+        return;
+    }
+    if (
+        discountFields.discount_mode === "amount"
+        && discountFields.discount_value > totals.subtotal
+    ) {
+        posError.textContent = "Discount cannot exceed the sale subtotal.";
+        return;
+    }
+    const total = totals.total;
+    if (total <= 0) {
+        posError.textContent = "Discount cannot reduce the sale total to zero.";
+        return;
+    }
     const splitPayments = payments && payments.length > 0;
     const amountPaid = splitPayments ? 0 : total;
     if (amountPaidInput) amountPaidInput.value = String(amountPaid);
@@ -278,6 +500,7 @@ async function checkoutSale(paymentMethod, payments = null) {
         button.disabled = false;
         return;
     }
+    button.disabled = true;
 
     const payload = {
         customer_id: customerId ? Number(customerId) : null,
@@ -290,6 +513,7 @@ async function checkoutSale(paymentMethod, payments = null) {
         })),
         amount_paid: amountPaid,
         payment_method: splitPayments ? null : paymentMethod,
+        ...discountFields,
     };
     const serializedPayload = JSON.stringify(payload);
     if (checkoutIdempotencyPayload !== serializedPayload) {
@@ -338,9 +562,13 @@ async function checkoutSale(paymentMethod, payments = null) {
     }
 }
 
-async function saveDraft() {
+async function saveDraft(returnToDashboard = false) {
     posError.textContent = "";
     if (cart.size === 0) {
+        if (returnToDashboard) {
+            window.location.assign("/dashboard");
+            return;
+        }
         posError.textContent = "Add at least one item to save a draft.";
         return;
     }
@@ -356,6 +584,7 @@ async function saveDraft() {
         })),
         amount_paid: 0,
         payment_method: null,
+        ...checkoutDiscountFields(),
         save_draft: true,
     };
     const response = await fetch("/sales/create", {
@@ -369,7 +598,7 @@ async function saveDraft() {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.detail || "Draft sale could not be saved");
-    window.location.reload();
+    window.location.assign(returnToDashboard ? "/dashboard" : window.location.href);
 }
 
 posForm.addEventListener("submit", (event) => {
@@ -380,6 +609,14 @@ document.querySelector("#cash-pay")?.addEventListener("click", () => checkoutSal
 document.querySelector("#card-pay")?.addEventListener("click", () => checkoutSale("card"));
 document.querySelector("#save-sale")?.addEventListener("click", () => {
     saveDraft().catch((error) => { posError.textContent = error.message; });
+});
+document.querySelector("#pause-sale-and-exit")?.addEventListener("click", (event) => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    saveDraft(true).catch((error) => {
+        posError.textContent = error.message;
+        button.disabled = false;
+    });
 });
 
 const multiplePaymentDialog = document.querySelector("#multiple-payment-dialog");
@@ -413,7 +650,7 @@ function multiplePaymentTotal() {
 }
 
 function saleTotal() {
-    return [...cart.values()].reduce((sum, line) => sum + line.lineTotal, 0);
+    return calculateCartTotals().total;
 }
 
 function updateMultiplePaymentRemaining() {
@@ -481,6 +718,12 @@ document.querySelectorAll(".resume-sale").forEach((button) => {
         const event = posForm.elements.namedItem("event_id");
         if (customer) customer.value = button.dataset.customerId;
         if (event) event.value = button.dataset.eventId;
+        const saleDiscountMode = draftItems[0]?.sale_discount_mode || "automatic";
+        const saleDiscountValue = draftItems[0]?.sale_discount_value || "";
+        discountMode.value = saleDiscountMode;
+        discountValue.value = saleDiscountValue;
+        previousDiscountMode = saleDiscountMode;
+        syncDiscountControl();
         const response = await fetch(`/sales/draft/${button.dataset.draftId}`, {
             method: "DELETE",
             credentials: "same-origin",
@@ -495,5 +738,10 @@ document.querySelectorAll(".resume-sale").forEach((button) => {
 });
 
 posForm.elements.namedItem("amount_paid").addEventListener("input", renderCart);
+syncDiscountControl();
 renderCart();
 updateSelectedPrice();
+
+if (posForm.dataset.resumeDraftId) {
+    document.querySelector(`.resume-sale[data-draft-id="${posForm.dataset.resumeDraftId}"]`)?.click();
+}

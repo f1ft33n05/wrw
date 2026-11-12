@@ -15,8 +15,6 @@
   <main class="content-container receipt">
     <div class="receipt-page-actions">
       <a role="button" class="secondary no-print" href="/sales/pos"><-- POS</a>
-      <button class="no-print" type="button" data-export-action="excel" data-export-target="#receipt-content" data-export-name="Receipt-{{ invoice.id }}">Excel</button>
-      <button class="no-print secondary" type="button" data-export-action="csv" data-export-target="#receipt-content" data-export-name="Receipt-{{ invoice.id }}">CSV</button>
       <button class="no-print secondary" type="button" data-export-action="print" data-export-target="#receipt-content">Print</button>
     </div>
     <article id="receipt-content">
@@ -44,7 +42,15 @@
           <tr>
             <td>{{ line.description }}</td>
             <td>{{ line.quantity }}</td>
-            <td>{{ line.unit_prices }}</td>
+            <td>
+              {% if line.unit_prices|length > 1 %}
+                {% for price in line.unit_prices %}
+                  <div>{{ price.quantity }} @ {{ price.unit_price|plain_money }}</div>
+                {% endfor %}
+              {% else %}
+                {{ line.unit_prices[0].unit_price|plain_money }}
+              {% endif %}
+            </td>
             <td>{{ line.total|plain_money }}</td>
           </tr>
           {% endfor %}

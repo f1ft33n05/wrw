@@ -8,7 +8,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.templating import Jinja2Templates
 from jose import ExpiredSignatureError, JWTError, jwt
 from passlib.context import CryptContext
-from database_models import User, RolePermission
+from database_models import Invoices, User, RolePermission
 from database import db_dependency
 from starlette import status
 from typing import Annotated
@@ -194,7 +194,29 @@ async def get_current_user(
         user = db.query(User).filter(User.id == user_id).first()
         if user is None or user.username != username:
             raise credentials_exception
-        return {"username": user.username, "name": user.name, "id": user.id, "role": user.role}
+        current_user = {
+            "username": user.username,
+            "name": user.name,
+            "id": user.id,
+            "role": user.role,
+        }
+        is_html_page_request = (
+            request.method in {"GET", "HEAD"}
+            and "text/html" in request.headers.get("accept", "").lower()
+        )
+        if is_html_page_request:
+            paused_draft = (
+                db.query(Invoices.id)
+                .filter(
+                    Invoices.created_by == user.id,
+                    Invoices.status == "draft",
+                    Invoices.document_number.is_(None),
+                )
+                .order_by(Invoices.id.desc())
+                .first()
+            )
+            current_user["paused_pos_draft_id"] = paused_draft[0] if paused_draft else None
+        return current_user
     except ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
