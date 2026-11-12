@@ -137,11 +137,11 @@
 
     <aside class="pos-quick-toolbar" aria-label="POS quick actions">
       <details>
-        <summary aria-label="Toggle POS quick actions">Quick actions</summary>
+        <summary aria-label="Toggle POS quick actions">Quick Actions</summary>
         <div class="pos-quick-toolbar-content">
-          <button type="button" id="pause-sale-and-exit">Pause sale &amp; return to dashboard</button>
-          <a role="button" href="/dashboard">Return to dashboard</a>
-          <a role="button" href="/sales/returns">Sale return</a>
+          <a role="button" class="pico-background-red-600" href="/dashboard">Close POS</a>
+          <button type="button" id="pause-sale-and-exit">Jump to Dashboard</button>
+          <a role="button" href="/sales/returns">Return Sale</a>
           <section aria-labelledby="pos-recent-transactions">
             <h2 id="pos-recent-transactions">Recent sales</h2>
             {% for transaction in recent_transactions %}
@@ -149,7 +149,6 @@
               <strong>#{{ transaction.id }} · {{ transaction.customer }}</strong>
               <small>{{ transaction.created_at }} · MWK {{ transaction.total }}</small>
               <a href="/sales/{{ transaction.id }}/receipt">Reprint receipt</a>
-              <a href="/sales/returns?invoice_id={{ transaction.id }}">Return items</a>
             </article>
             {% else %}
             <p>No recent sales.</p>

@@ -123,7 +123,7 @@ button {
 }
 
 .pos-page {
-    width: min(180rem, 100%);
+    width: 90%;
     height: calc(100vh - 7rem);
     height: calc(100dvh - 7rem);
     margin: 0 auto;
@@ -565,7 +565,6 @@ button {
 
 .pos-quick-toolbar details {
     position: sticky;
-    top: 1rem;
     width: 4.8rem;
     max-height: calc(100% - 1rem);
     overflow: visible;
@@ -599,6 +598,7 @@ button {
     display: none;
 }
 
+
 .pos-quick-toolbar details[open] summary {
     display: block;
     min-height: 0;
@@ -617,6 +617,8 @@ button {
 .pos-quick-toolbar-content > a[role="button"] {
     width: 100%;
     margin: 0;
+    font-size: 1.4rem;
+    border: none;
 }
 
 .pos-quick-toolbar-content section {
@@ -631,8 +633,8 @@ button {
 
 .pos-recent-transaction {
     display: grid;
-    gap: .3rem;
-    padding: .8rem 0;
+    gap: .2rem;
+    padding: .5rem 0;
     border-top: 1px solid var(--pico-muted-border-color);
     font-size: 1.3rem;
 }
@@ -682,7 +684,6 @@ button {
 
     .pos-quick-toolbar details {
         position: sticky;
-        top: 1rem;
     }
 
     .pos-quick-toolbar details[open] {
