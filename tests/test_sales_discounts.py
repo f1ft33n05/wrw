@@ -190,3 +190,45 @@ def test_checkout_manual_customer_and_item_discounts(db):
     )
     assert Decimal(fixed_sale.discount_amount) == Decimal("12.00")
     assert Decimal(fixed_sale.total_price) == Decimal("88.00")
+
+
+def test_sale_quote_matches_checkout_pricing_without_creating_a_sale(db):
+    category = ItemCategory(name="Wine")
+    db.add(category)
+    db.flush()
+    item = Item(
+        name="Red wine",
+        category_id=category.id,
+        selling_price_retail="100.00",
+        selling_price_wholesale="80.00",
+        wholesale_threshold="6",
+        quantity="50",
+    )
+    db.add(item)
+    db.flush()
+    db.add(ItemDiscount(
+        name="Item rate",
+        discount_type="item",
+        target_id=item.id,
+        percentage="10",
+        active=1,
+    ))
+    db.commit()
+    checkout = CheckoutRequest(
+        items=[{"item_id": item.id, "quantity": 6}],
+        amount_paid=0,
+    )
+
+    quote = asyncio.run(sales.quote_sale(checkout, db))
+
+    assert quote["subtotal"] == "480.00"
+    assert quote["discount_amount"] == "48.00"
+    assert quote["total_amount"] == "432.00"
+    assert quote["items"] == [{
+        "item_id": item.id,
+        "name": "Red wine",
+        "quantity": "6",
+        "total": "432.00",
+    }]
+    assert db.query(Invoices).count() == 0
+    assert db.query(Item).filter_by(id=item.id).one().quantity == "50"

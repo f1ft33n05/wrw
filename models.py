@@ -43,11 +43,17 @@ class UserResponse(BaseModel):
     id: int
     name: str
     username: str
-    email: str
-    phone: str
+    email: str | None
+    phone: str | None
     role: str
     created_at: str | None = None
     updated_at: str | None = None
+
+
+class ProfileUpdateRequest(BaseModel):
+    name: str = Field(min_length=1)
+    email: str | None = None
+    phone: str | None = None
 
 
 class CreateContactRequest(BaseModel):

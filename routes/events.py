@@ -26,6 +26,7 @@ from event_stock import (
     parse_event_start_timestamp,
     return_expired_event_stock,
 )
+from config import APP_TIMEZONE
 
 
 router = APIRouter(tags=["events"])
@@ -104,6 +105,30 @@ async def events_page(request: Request, user: user_dependency, db: db_dependency
             "stock_items": items,
         },
     )
+
+
+@router.get("/events/active", dependencies=[EVENT_VIEW_ACCESS])
+async def active_events(db: db_dependency):
+    now = datetime.now(timezone.utc)
+    return_expired_event_stock(db, now)
+    today = now.astimezone(APP_TIMEZONE).date()
+    events = db.query(Events).filter(Events.status == "active").order_by(
+        Events.starts_at.desc(), Events.name
+    ).all()
+    return [
+        {
+            "id": event.id,
+            "name": event.name,
+            "venue": event.venue,
+            "starts_at": event.starts_at,
+        }
+        for event in events
+        if (
+            (starts_at := parse_event_start_timestamp(event.starts_at)) is not None
+            and starts_at.astimezone(APP_TIMEZONE).date() == today
+            and not event_is_expired(event, now)
+        )
+    ]
 
 
 @router.post("/events", dependencies=[EVENT_ACCESS])

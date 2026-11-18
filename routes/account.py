@@ -9,6 +9,7 @@ from starlette import status
 
 from database import db_dependency
 from database_models import User
+from models import ProfileUpdateRequest, UserResponse
 from routes.auth import get_current_user
 
 
@@ -16,6 +17,58 @@ router = APIRouter(tags=["account"])
 templates = Jinja2Templates(directory="templates")
 user_dependency = Annotated[dict, Depends(get_current_user)]
 password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def _profile_response(user: User) -> dict:
+    return UserResponse(
+        id=user.id,
+        name=user.name,
+        username=user.username,
+        email=user.email,
+        phone=user.phone,
+        role=user.role,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+    ).model_dump()
+
+
+@router.get("/profile/data")
+async def mobile_profile(current_user: user_dependency, db: db_dependency):
+    user = db.query(User).filter(User.id == current_user["id"]).first()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return _profile_response(user)
+
+
+@router.patch("/profile/data")
+async def update_mobile_profile(
+    payload: ProfileUpdateRequest,
+    current_user: user_dependency,
+    db: db_dependency,
+):
+    user = db.query(User).filter(User.id == current_user["id"]).first()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    name = payload.name.strip()
+    email = payload.email.strip().lower() if payload.email else None
+    phone = payload.phone.strip() if payload.phone else None
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Name is required",
+        )
+    if email and db.query(User).filter(User.email == email, User.id != user.id).first():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is already in use")
+    if phone and db.query(User).filter(User.phone == phone, User.id != user.id).first():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Phone is already in use")
+
+    user.name = name
+    user.email = email
+    user.phone = phone
+    db.commit()
+    db.refresh(user)
+    return _profile_response(user)
 
 
 @router.get("/profile", response_class=HTMLResponse)
