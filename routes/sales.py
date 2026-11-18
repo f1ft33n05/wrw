@@ -1,9 +1,9 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette import status
@@ -149,6 +149,205 @@ def _allocate_discount_to_lines(
         )
         line["total"] = str(line_total)
         line["unit_price"] = str(_money(line_total / quantity))
+
+
+def _validate_sale_event(db, event_id: int | None, *, lock: bool = False):
+    if event_id is None:
+        return None
+
+    query = db.query(Events).filter(Events.id == event_id)
+    if lock:
+        query = query.with_for_update()
+    event = query.first()
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if event.status not in {"planned", "active"}:
+        raise HTTPException(status_code=409, detail="Sales cannot be closed for this event")
+    if not _event_starts_on(event.starts_at, datetime.now(APP_TIMEZONE).date()):
+        raise HTTPException(status_code=409, detail="Sales can only be created on the event start date")
+    return event
+
+
+def _calculate_sale_quote(
+    db,
+    checkout: CheckoutRequest,
+    quantities: dict[int, Decimal],
+    items_by_id: dict[int, Item],
+    *,
+    lock_stock: bool = False,
+) -> tuple[list[dict], Decimal, Decimal, Decimal]:
+    if checkout.customer_id is not None:
+        customer = (
+            db.query(Contact)
+            .filter(
+                Contact.id == checkout.customer_id,
+                Contact.contact_type == "customer",
+            )
+            .first()
+        )
+        if customer is None:
+            raise HTTPException(status_code=404, detail="Customer not found")
+
+    customer_discount = _active_customer_discount(db, checkout.customer_id)
+    invoice_lines = []
+    subtotal = Decimal("0")
+    for item_id, quantity in quantities.items():
+        item = items_by_id[item_id]
+        stock = _decimal(item.quantity or "0", "stock quantity")
+        if checkout.event_id is not None:
+            allocation_query = db.query(EventStockAllocation).filter(
+                EventStockAllocation.event_id == checkout.event_id,
+                EventStockAllocation.item_id == item_id,
+                EventStockAllocation.status == "active",
+            )
+            if lock_stock:
+                allocation_query = allocation_query.with_for_update()
+            allocation = allocation_query.first()
+            if allocation is None:
+                raise HTTPException(status_code=409, detail=f"{item.name} is not assigned to this event")
+            available = _decimal(allocation.quantity_remaining, "remaining event stock")
+        else:
+            available = stock
+        if quantity > available:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Insufficient available stock for {item.name}; available: {available}",
+            )
+
+        threshold = _decimal(
+            item.wholesale_threshold or "6",
+            "wholesale threshold",
+        )
+        if threshold <= 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"{item.name} has an invalid wholesale threshold",
+            )
+        wholesale_quantity = (quantity // threshold) * threshold
+        retail_quantity = quantity - wholesale_quantity
+        wholesale_unit_price = _money(
+            _decimal(
+                item.selling_price_wholesale or "0",
+                "wholesale item price",
+            )
+        )
+        retail_unit_price = _money(
+            _decimal(item.selling_price_retail or "0", "retail item price")
+        )
+        if wholesale_quantity and wholesale_unit_price <= 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"{item.name} does not have a valid wholesale price",
+            )
+        if retail_quantity and retail_unit_price <= 0:
+            raise HTTPException(
+                status_code=409,
+                detail=f"{item.name} does not have a valid retail price",
+            )
+
+        discount_percentage = _active_discount(db, item)
+        undiscounted_total = _money(
+            wholesale_unit_price * wholesale_quantity
+            + retail_unit_price * retail_quantity
+        )
+        discount_amount = _money(undiscounted_total * discount_percentage / Decimal("100"))
+        line_total = _money(undiscounted_total - discount_amount)
+        unit_price = _money(line_total / quantity)
+        price_type = (
+            "mixed"
+            if wholesale_quantity and retail_quantity
+            else "wholesale"
+            if wholesale_quantity
+            else "retail"
+        )
+        subtotal += undiscounted_total
+        invoice_lines.append(
+            {
+                "item_id": item.id,
+                "name": item.name,
+                "description": item.name,
+                "quantity": str(quantity),
+                "unit_price": str(unit_price),
+                "total": str(line_total),
+                "subtotal": str(undiscounted_total),
+                "discount_percentage": str(discount_percentage),
+                "discount_amount": str(discount_amount),
+                "price_type": price_type,
+                "wholesale_quantity": str(wholesale_quantity),
+                "wholesale_unit_price": str(wholesale_unit_price),
+                "retail_quantity": str(retail_quantity),
+                "retail_unit_price": str(retail_unit_price),
+                "unit_prices": (
+                    f"{_compact_decimal(wholesale_unit_price, 'wholesale price')}:"
+                    f"{_compact_decimal(retail_unit_price, 'retail price')}"
+                ),
+            }
+        )
+
+    subtotal = _money(subtotal)
+    customer_discount_applies = (
+        checkout.discount_mode == "automatic" and customer_discount > 0
+    )
+    sale_discount_applies = (
+        checkout.discount_mode != "automatic" or customer_discount_applies
+    )
+    if sale_discount_applies:
+        if checkout.discount_mode == "percentage":
+            sale_discount_amount = _money(
+                subtotal * checkout.discount_value / Decimal("100")
+            )
+        elif checkout.discount_mode == "amount":
+            if checkout.discount_value > subtotal:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Discount cannot exceed the sale subtotal",
+                )
+            sale_discount_amount = _money(checkout.discount_value)
+        else:
+            sale_discount_amount = _money(
+                subtotal * customer_discount / Decimal("100")
+            )
+        _allocate_discount_to_lines(
+            invoice_lines,
+            subtotal,
+            sale_discount_amount,
+        )
+        total_discount = sale_discount_amount
+        total = _money(subtotal - total_discount)
+    else:
+        if any(
+            _decimal(line["total"], "invoice line total") <= 0
+            for line in invoice_lines
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail="A discount cannot reduce an item total to zero",
+            )
+        total = _money(
+            sum(
+                (_decimal(line["total"], "invoice line total") for line in invoice_lines),
+                Decimal("0"),
+            )
+        )
+        total_discount = _money(
+            sum(
+                (_decimal(line["discount_amount"], "line discount amount") for line in invoice_lines),
+                Decimal("0"),
+            )
+        )
+    if total <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail="Discount cannot reduce the sale total to zero",
+        )
+    for line in invoice_lines:
+        line["sale_discount_mode"] = checkout.discount_mode
+        line["sale_discount_value"] = (
+            str(checkout.discount_value)
+            if checkout.discount_value is not None
+            else None
+        )
+    return invoice_lines, subtotal, total_discount, total
 
 
 templates.env.filters["money"] = _format_money
@@ -325,6 +524,128 @@ async def list_sales(db: db_dependency):
             updated_at=_timestamp(sale.updated_at),
         ))
     return results
+
+
+@router.get("/history", dependencies=[SALES_ACCESS])
+async def sales_history(
+    db: db_dependency,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
+):
+    invoice_page = (
+        db.query(Invoices)
+        .join(SalesTxn, SalesTxn.invoice_id == Invoices.id)
+        .filter(Invoices.status != "draft")
+        .order_by(Invoices.created_at.desc(), Invoices.id.desc())
+        .distinct()
+        .offset(offset)
+        .limit(limit + 1)
+        .all()
+    )
+    has_more = len(invoice_page) > limit
+    invoices = invoice_page[:limit]
+    invoice_ids = {invoice.id for invoice in invoices}
+    sales = (
+        db.query(SalesTxn)
+        .filter(SalesTxn.invoice_id.in_(invoice_ids))
+        .all()
+        if invoice_ids
+        else []
+    )
+    payments = (
+        db.query(Payments)
+        .filter(
+            Payments.invoice_id.in_(invoice_ids),
+            Payments.status == "completed",
+        )
+        .all()
+        if invoice_ids
+        else []
+    )
+    customer_ids = {
+        invoice.customer_id
+        for invoice in invoices
+        if invoice.customer_id is not None
+    }
+    customers = (
+        db.query(Contact).filter(Contact.id.in_(customer_ids)).all()
+        if customer_ids
+        else []
+    )
+    customer_names = {customer.id: customer.name for customer in customers}
+    line_counts: dict[int, int] = {}
+    for sale in sales:
+        line_counts[sale.invoice_id] = line_counts.get(sale.invoice_id, 0) + 1
+    paid_by_invoice: dict[int, Decimal] = {}
+    methods_by_invoice: dict[int, set[str]] = {}
+    for payment in payments:
+        paid_by_invoice[payment.invoice_id] = (
+            paid_by_invoice.get(payment.invoice_id, Decimal("0"))
+            + _decimal(payment.amount, "payment amount")
+        )
+        if payment.payment_method:
+            methods_by_invoice.setdefault(payment.invoice_id, set()).add(
+                payment.payment_method
+            )
+
+    history = []
+    for invoice in invoices:
+        total = _decimal(invoice.total_price, "invoice total")
+        paid = paid_by_invoice.get(invoice.id, Decimal("0"))
+        history.append({
+            "invoice_id": invoice.id,
+            "created_at": _timestamp(invoice.created_at),
+            "customer_name": customer_names.get(
+                invoice.customer_id,
+                "Walk-in customer",
+            ),
+            "status": invoice.status,
+            "total_amount": str(total),
+            "amount_paid": str(paid),
+            "balance_due": str(max(total - paid, Decimal("0"))),
+            "item_count": line_counts.get(invoice.id, 0),
+            "payment_methods": sorted(methods_by_invoice.get(invoice.id, set())),
+        })
+
+    next_offset = offset + len(invoices) if has_more else None
+    return {"sales": history, "next_offset": next_offset}
+
+
+@router.get("/dashboard", dependencies=[SALES_ACCESS])
+async def mobile_dashboard(db: db_dependency):
+    now = datetime.now(APP_TIMEZONE)
+    today = now.date()
+    start_local = datetime.combine(today, time.min, tzinfo=APP_TIMEZONE)
+    end_local = start_local + timedelta(days=1)
+    payment_start = (start_local.astimezone(timezone.utc) - timedelta(days=1)).isoformat()
+    payment_end = (end_local.astimezone(timezone.utc) + timedelta(days=1)).isoformat()
+    payment_candidates = (
+        db.query(Payments)
+        .filter(
+            Payments.status == "completed",
+            Payments.created_at >= payment_start,
+            Payments.created_at < payment_end,
+        )
+        .all()
+    )
+    today_payments = [
+        payment
+        for payment in payment_candidates
+        if _timestamp(payment.created_at) is not None
+        and datetime.fromisoformat(_timestamp(payment.created_at)).date() == today
+    ]
+    paid_today = sum(
+        (_decimal(payment.amount, "payment amount") for payment in today_payments),
+        Decimal("0"),
+    )
+    recent_page = await sales_history(db=db, offset=0, limit=10)
+    return {
+        "total_paid_today": str(paid_today),
+        "transaction_count_today": len({
+            payment.invoice_id for payment in today_payments
+        }),
+        "recent_sales": recent_page["sales"],
+    }
 
 
 @router.get(
@@ -911,6 +1232,52 @@ async def pos_screen(
 
 
 @router.post(
+    "/quote",
+    dependencies=[SALES_ACCESS],
+)
+async def quote_sale(checkout: CheckoutRequest, db: db_dependency):
+    _validate_sale_event(db, checkout.event_id)
+    quantities: dict[int, Decimal] = {}
+    for line in checkout.items:
+        quantities[line.item_id] = quantities.get(line.item_id, Decimal("0")) + line.quantity
+
+    items = (
+        db.query(Item)
+        .filter(Item.id.in_(quantities))
+        .order_by(Item.id)
+        .all()
+    )
+    items_by_id = {item.id: item for item in items}
+    missing_ids = set(quantities) - items_by_id.keys()
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item not found: {min(missing_ids)}",
+        )
+
+    invoice_lines, subtotal, discount_amount, total = _calculate_sale_quote(
+        db,
+        checkout,
+        quantities,
+        items_by_id,
+    )
+    return {
+        "subtotal": str(subtotal),
+        "discount_amount": str(discount_amount),
+        "total_amount": str(total),
+        "items": [
+            {
+                "item_id": line["item_id"],
+                "name": line["name"],
+                "quantity": line["quantity"],
+                "total": line["total"],
+            }
+            for line in invoice_lines
+        ],
+    }
+
+
+@router.post(
     "/create",
     status_code=status.HTTP_201_CREATED,
     dependencies=[SALES_ACCESS],
@@ -925,15 +1292,8 @@ async def create_sale(
     cached = get_cached_response(db, request)
     if cached:
         return JSONResponse(status_code=cached[0], content=cached[1])
-    event = None
-    if checkout.event_id is not None:
-        event = db.query(Events).filter(Events.id == checkout.event_id).with_for_update().first()
-        if event is None:
-            raise HTTPException(status_code=404, detail="Event not found")
-        if event.status not in {"planned", "active"}:
-            raise HTTPException(status_code=409, detail="Sales cannot be closed for this event")
-        if not _event_starts_on(event.starts_at, datetime.now(APP_TIMEZONE).date()):
-            raise HTTPException(status_code=409, detail="Sales can only be created on the event start date")
+    event = _validate_sale_event(db, checkout.event_id, lock=True)
+    if event is not None:
         checkout.location = f"Event: {event.name}"
 
     if checkout.payment_method is not None:
@@ -976,174 +1336,13 @@ async def create_sale(
                 detail=f"Item not found: {min(missing_ids)}",
             )
 
-        if checkout.customer_id is not None:
-            customer = (
-                db.query(Contact)
-                .filter(
-                    Contact.id == checkout.customer_id,
-                    Contact.contact_type == "customer",
-                )
-                .first()
-            )
-            if customer is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Customer not found",
-                )
-
-        customer_discount = _active_customer_discount(db, checkout.customer_id)
-        invoice_lines = []
-        subtotal = Decimal("0")
-        for item_id, quantity in quantities.items():
-            item = items_by_id[item_id]
-            stock = _decimal(item.quantity or "0", "stock quantity")
-            if checkout.event_id is not None:
-                allocation = db.query(EventStockAllocation).filter(
-                    EventStockAllocation.event_id == checkout.event_id,
-                    EventStockAllocation.item_id == item_id,
-                    EventStockAllocation.status == "active",
-                ).with_for_update().first()
-                if allocation is None:
-                    raise HTTPException(status_code=409, detail=f"{item.name} is not assigned to this event")
-                available = _decimal(allocation.quantity_remaining, "remaining event stock")
-            else:
-                available = stock
-            if quantity > available:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Insufficient available stock for {item.name}; available: {available}",
-                )
-            threshold = _decimal(
-                item.wholesale_threshold or "6",
-                "wholesale threshold",
-            )
-            if threshold <= 0:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"{item.name} has an invalid wholesale threshold",
-                )
-            wholesale_quantity = (quantity // threshold) * threshold
-            retail_quantity = quantity - wholesale_quantity
-            wholesale_unit_price = _money(
-                _decimal(
-                    item.selling_price_wholesale or "0",
-                    "wholesale item price",
-                )
-            )
-            retail_unit_price = _money(
-                _decimal(item.selling_price_retail or "0", "retail item price")
-            )
-            if wholesale_quantity and wholesale_unit_price <= 0:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"{item.name} does not have a valid wholesale price",
-                )
-            if retail_quantity and retail_unit_price <= 0:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=f"{item.name} does not have a valid retail price",
-                )
-            discount_percentage = _active_discount(db, item)
-            undiscounted_total = _money(
-                wholesale_unit_price * wholesale_quantity
-                + retail_unit_price * retail_quantity
-            )
-            discount_amount = _money(undiscounted_total * discount_percentage / Decimal("100"))
-            line_total = _money(undiscounted_total - discount_amount)
-            unit_price = _money(line_total / quantity)
-            price_type = (
-                "mixed"
-                if wholesale_quantity and retail_quantity
-                else "wholesale"
-                if wholesale_quantity
-                else "retail"
-            )
-            subtotal += undiscounted_total
-            invoice_lines.append(
-                {
-                    "item_id": item.id,
-                    "name": item.name,
-                    "description": item.name,
-                    "quantity": str(quantity),
-                    "unit_price": str(unit_price),
-                    "total": str(line_total),
-                    "subtotal": str(undiscounted_total),
-                    "discount_percentage": str(discount_percentage),
-                    "discount_amount": str(discount_amount),
-                    "price_type": price_type,
-                    "wholesale_quantity": str(wholesale_quantity),
-                    "wholesale_unit_price": str(wholesale_unit_price),
-                    "retail_quantity": str(retail_quantity),
-                    "retail_unit_price": str(retail_unit_price),
-                    "unit_prices": (
-                        f"{_compact_decimal(wholesale_unit_price, 'wholesale price')}:"
-                        f"{_compact_decimal(retail_unit_price, 'retail price')}"
-                    ),
-                }
-            )
-        subtotal = _money(subtotal)
-        customer_discount_applies = (
-            checkout.discount_mode == "automatic" and customer_discount > 0
+        invoice_lines, subtotal, total_discount, total = _calculate_sale_quote(
+            db,
+            checkout,
+            quantities,
+            items_by_id,
+            lock_stock=True,
         )
-        sale_discount_applies = (
-            checkout.discount_mode != "automatic" or customer_discount_applies
-        )
-        if sale_discount_applies:
-            if checkout.discount_mode == "percentage":
-                sale_discount_amount = _money(
-                    subtotal * checkout.discount_value / Decimal("100")
-                )
-            elif checkout.discount_mode == "amount":
-                if checkout.discount_value > subtotal:
-                    raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                        detail="Discount cannot exceed the sale subtotal",
-                    )
-                sale_discount_amount = _money(checkout.discount_value)
-            else:
-                sale_discount_amount = _money(
-                    subtotal * customer_discount / Decimal("100")
-                )
-            _allocate_discount_to_lines(
-                invoice_lines,
-                subtotal,
-                sale_discount_amount,
-            )
-            total_discount = sale_discount_amount
-            total = _money(subtotal - total_discount)
-        else:
-            if any(
-                _decimal(line["total"], "invoice line total") <= 0
-                for line in invoice_lines
-            ):
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="A discount cannot reduce an item total to zero",
-                )
-            total = _money(
-                sum(
-                    (_decimal(line["total"], "invoice line total") for line in invoice_lines),
-                    Decimal("0"),
-                )
-            )
-            total_discount = _money(
-                sum(
-                    (_decimal(line["discount_amount"], "line discount amount") for line in invoice_lines),
-                    Decimal("0"),
-                )
-            )
-        if total <= 0:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Discount cannot reduce the sale total to zero",
-            )
-        for line in invoice_lines:
-            line["sale_discount_mode"] = checkout.discount_mode
-            line["sale_discount_value"] = (
-                str(checkout.discount_value)
-                if checkout.discount_value is not None
-                else None
-            )
         amount_paid = min(tendered_amount, total)
         change_amount = tendered_amount - amount_paid
 
@@ -1350,6 +1549,152 @@ async def record_payment(
     except Exception:
         db.rollback()
         raise
+
+
+@router.get("/{invoice_id}/receipt/data", dependencies=[SALES_ACCESS])
+async def receipt_data(invoice_id: int, db: db_dependency):
+    invoice = db.query(Invoices).filter(Invoices.id == invoice_id).first()
+    if invoice is None:
+        raise HTTPException(status_code=404, detail="Sale receipt not found")
+
+    sales = (
+        db.query(SalesTxn)
+        .filter(SalesTxn.invoice_id == invoice_id)
+        .order_by(SalesTxn.id)
+        .all()
+    )
+    if not sales:
+        raise HTTPException(status_code=404, detail="Sale receipt not found")
+
+    try:
+        invoice_lines = json.loads(invoice.items or "[]")
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Sale receipt data is invalid",
+        ) from exc
+    if not isinstance(invoice_lines, list) or any(
+        not isinstance(line, dict) for line in invoice_lines
+    ):
+        raise HTTPException(
+            status_code=500,
+            detail="Sale receipt data is invalid",
+        )
+    invoice_line_by_item = {
+        line["item_id"]: line
+        for line in invoice_lines
+        if "item_id" in line
+    }
+    item_ids = {sale.item_id for sale in sales}
+    items = db.query(Item).filter(Item.id.in_(item_ids)).all() if item_ids else []
+    item_names = {item.id: item.name for item in items}
+
+    payments = (
+        db.query(Payments)
+        .filter(
+            Payments.invoice_id == invoice_id,
+            Payments.status == "completed",
+        )
+        .order_by(Payments.id)
+        .all()
+    )
+    total = _decimal(invoice.total_price, "invoice total")
+    paid = sum(
+        (_decimal(payment.amount, "payment amount") for payment in payments),
+        Decimal("0"),
+    )
+    change = sum(
+        (
+            _decimal(payment.change_amount or "0", "change amount")
+            for payment in payments
+        ),
+        Decimal("0"),
+    )
+    cashier_id = invoice.created_by or next(
+        (payment.collected_by for payment in payments if payment.collected_by),
+        None,
+    )
+    cashier = db.query(User).filter(User.id == cashier_id).first() if cashier_id else None
+    customer = (
+        db.query(Contact).filter(Contact.id == invoice.customer_id).first()
+        if invoice.customer_id is not None
+        else None
+    )
+    event = (
+        db.query(Events).filter(Events.id == invoice.event_id).first()
+        if invoice.event_id is not None
+        else None
+    )
+
+    lines = []
+    for sale in sales:
+        snapshot = invoice_line_by_item.get(sale.item_id, {})
+        wholesale_quantity = _decimal(
+            snapshot.get("wholesale_quantity", "0"),
+            "wholesale quantity",
+        )
+        retail_quantity = _decimal(
+            snapshot.get("retail_quantity", "0"),
+            "retail quantity",
+        )
+        unit_prices = []
+        if wholesale_quantity > 0 and snapshot.get("wholesale_unit_price") is not None:
+            unit_prices.append({
+                "quantity": str(wholesale_quantity),
+                "price_type": "wholesale",
+                "unit_price": str(snapshot["wholesale_unit_price"]),
+            })
+        if retail_quantity > 0 and snapshot.get("retail_unit_price") is not None:
+            unit_prices.append({
+                "quantity": str(retail_quantity),
+                "price_type": "retail",
+                "unit_price": str(snapshot["retail_unit_price"]),
+            })
+        if not unit_prices:
+            unit_prices.append({
+                "quantity": str(_decimal(sale.quantity, "sold quantity")),
+                "price_type": sale.price_type or "unit",
+                "unit_price": str(sale.unit_price or "0.00"),
+            })
+        lines.append({
+            "name": snapshot.get("name", item_names.get(sale.item_id, "Item")),
+            "description": snapshot.get(
+                "description",
+                snapshot.get("name", item_names.get(sale.item_id, "Item")),
+            ),
+            "quantity": str(_decimal(sale.quantity, "sold quantity")),
+            "unit_prices": unit_prices,
+            "total": str(_decimal(sale.total_price, "sale amount")),
+        })
+
+    return {
+        "invoice_id": invoice.id,
+        "status": invoice.status,
+        "created_at": _timestamp(invoice.created_at),
+        "customer_name": customer.name if customer else "Walk-in customer",
+        "event_name": event.name if event else None,
+        "cashier_name": cashier.name if cashier else None,
+        "lines": lines,
+        "payments": [
+            {
+                "created_at": _timestamp(payment.created_at),
+                "payment_method": payment.payment_method,
+                "amount": str(_decimal(payment.amount, "payment amount")),
+                "change_amount": str(
+                    _decimal(payment.change_amount or "0", "change amount")
+                ),
+            }
+            for payment in payments
+        ],
+        "subtotal": str(_decimal(invoice.subtotal or "0", "invoice subtotal")),
+        "discount_amount": str(
+            _decimal(invoice.discount_amount or "0", "invoice discount")
+        ),
+        "total_amount": str(total),
+        "amount_paid": str(paid),
+        "balance_due": str(max(total - paid, Decimal("0"))),
+        "change_amount": str(change),
+    }
 
 
 @router.get(

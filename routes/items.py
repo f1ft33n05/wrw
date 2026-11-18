@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from openpyxl import Workbook, load_workbook
@@ -12,6 +12,8 @@ from openpyxl.styles import Font, PatternFill
 from starlette import status
 from database_models import (
     Contact,
+    EventStockAllocation,
+    Events,
     Item,
     ItemCategory,
     ItemDiscount,
@@ -27,6 +29,7 @@ from database import db_dependency
 from models import CreateItemRequest, CategoryRequest, DiscountRequest, Role, StockAdjustmentRequest
 from routes.auth import RoleChecker, get_current_user
 from config import APP_TIMEZONE as CONFIGURED_TIMEZONE
+from event_stock import parse_event_start_timestamp, return_expired_event_stock
 
 
 router = APIRouter(
@@ -55,8 +58,55 @@ def serialize_timestamp(value: datetime | str | None) -> str | None:
     response_model=list[CreateItemRequest],
     dependencies=[Depends(RoleChecker(Role.admin, Role.manager, Role.cashier))],
 )
-async def list_items(db: db_dependency):
-    items = db.query(Item).all()
+async def list_items(
+    db: db_dependency,
+    event_id: int | None = Query(default=None, ge=1),
+):
+    return list_catalogue(db, event_id)
+
+
+def list_catalogue(db, event_id: int | None = None):
+    quantities: dict[int, str] | None = None
+    if event_id is not None:
+        now = datetime.now(timezone.utc)
+        return_expired_event_stock(db, now)
+        event = db.query(Events).filter(Events.id == event_id).first()
+        starts_at = (
+            parse_event_start_timestamp(event.starts_at)
+            if event is not None
+            else None
+        )
+        if (
+            event is None
+            or event.status != "active"
+            or starts_at is None
+            or starts_at.astimezone(APP_TIMEZONE).date()
+            != now.astimezone(APP_TIMEZONE).date()
+        ):
+            raise HTTPException(status_code=404, detail="Active event not found")
+        allocations = (
+            db.query(EventStockAllocation)
+            .filter(
+                EventStockAllocation.event_id == event_id,
+                EventStockAllocation.status == "active",
+            )
+            .all()
+        )
+        quantities = {
+            allocation.item_id: allocation.quantity_remaining
+            for allocation in allocations
+            if Decimal(allocation.quantity_remaining or "0") > 0
+        }
+        items = (
+            db.query(Item)
+            .filter(Item.id.in_(quantities))
+            .all()
+            if quantities
+            else []
+        )
+    else:
+        items = db.query(Item).all()
+
     return [
         CreateItemRequest(
             id=item.id,
@@ -67,7 +117,7 @@ async def list_items(db: db_dependency):
             selling_price_wholesale=item.selling_price_wholesale,
             selling_price_retail=item.selling_price_retail,
             wholesale_threshold=item.wholesale_threshold or "6",
-            quantity=item.quantity,
+            quantity=quantities[item.id] if quantities is not None else item.quantity,
             unit=item.unit,
             created_at=serialize_timestamp(item.created_at),
             updated_at=serialize_timestamp(item.updated_at),
