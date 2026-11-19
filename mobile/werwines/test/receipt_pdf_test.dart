@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pdf/pdf.dart';
 import 'package:werwines/models.dart';
 import 'package:werwines/utils/receipt_pdf.dart';
+import 'package:werwines/utils/sales_report_pdf.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -49,4 +50,44 @@ void main() {
       closeTo(80 * PdfPageFormat.mm, 0.01),
     );
   });
+
+  test(
+    'builds an 80 mm cash-up report with payment and item breakdowns',
+    () async {
+      const report = SalesReport(
+        dateFrom: '2026-11-18',
+        dateTo: '2026-11-18',
+        cashierName: 'Cashier Casey',
+        transactionCount: 1,
+        totalSales: 140,
+        vat: 20,
+        totalPaid: 140,
+        balanceDue: 0,
+        sales: [],
+        paymentMethods: [
+          SalesReportPaymentMethod(
+            name: 'Cash',
+            transactionCount: 1,
+            amount: 140,
+          ),
+        ],
+        itemsSold: [
+          SalesReportItem(
+            name: 'Pinotage',
+            priceType: 'Retail',
+            quantity: 2,
+            totalAmount: 140,
+          ),
+        ],
+      );
+
+      final pdf = await buildSalesReportPdf(report);
+
+      expect(String.fromCharCodes(pdf.take(4)), '%PDF');
+      expect(
+        salesReportPageFormat(report).width,
+        closeTo(80 * PdfPageFormat.mm, 0.01),
+      );
+    },
+  );
 }

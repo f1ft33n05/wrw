@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Annotated
 
@@ -531,17 +531,24 @@ async def sales_history(
     db: db_dependency,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=100),
+    date_from: date | None = None,
+    date_to: date | None = None,
 ):
-    invoice_page = (
+    invoice_query = (
         db.query(Invoices)
         .join(SalesTxn, SalesTxn.invoice_id == Invoices.id)
         .filter(Invoices.status != "draft")
         .order_by(Invoices.created_at.desc(), Invoices.id.desc())
         .distinct()
-        .offset(offset)
-        .limit(limit + 1)
-        .all()
     )
+    if date_from is not None or date_to is not None:
+        matching_invoices = [
+            invoice for invoice in invoice_query.all()
+            if _invoice_in_date_range(invoice, date_from, date_to)
+        ]
+        invoice_page = matching_invoices[offset:offset + limit + 1]
+    else:
+        invoice_page = invoice_query.offset(offset).limit(limit + 1).all()
     has_more = len(invoice_page) > limit
     invoices = invoice_page[:limit]
     invoice_ids = {invoice.id for invoice in invoices}
@@ -609,6 +616,166 @@ async def sales_history(
 
     next_offset = offset + len(invoices) if has_more else None
     return {"sales": history, "next_offset": next_offset}
+
+
+def _invoice_in_date_range(
+    invoice: Invoices,
+    date_from: date | None,
+    date_to: date | None,
+) -> bool:
+    timestamp = _timestamp(invoice.created_at)
+    if timestamp is None:
+        return False
+    try:
+        sale_date = datetime.fromisoformat(timestamp).date()
+    except ValueError:
+        return False
+    return (
+        (date_from is None or sale_date >= date_from)
+        and (date_to is None or sale_date <= date_to)
+    )
+
+
+@router.get("/report/data", dependencies=[SALES_ACCESS])
+async def mobile_sales_report(
+    db: db_dependency,
+    user: user_dependency,
+    date_from: date = Query(),
+    date_to: date = Query(),
+):
+    if date_from > date_to:
+        raise HTTPException(
+            status_code=422,
+            detail="The report start date must be on or before the end date.",
+        )
+
+    invoices = [
+        invoice
+        for invoice in (
+            db.query(Invoices)
+            .join(SalesTxn, SalesTxn.invoice_id == Invoices.id)
+            .filter(Invoices.status != "draft")
+            .order_by(Invoices.created_at.desc(), Invoices.id.desc())
+            .distinct()
+            .all()
+        )
+        if _invoice_in_date_range(invoice, date_from, date_to)
+    ]
+    invoice_ids = {invoice.id for invoice in invoices}
+    sales = (
+        db.query(SalesTxn).filter(SalesTxn.invoice_id.in_(invoice_ids)).all()
+        if invoice_ids else []
+    )
+    payments = (
+        db.query(Payments)
+        .filter(
+            Payments.invoice_id.in_(invoice_ids),
+            Payments.status == "completed",
+        )
+        .all()
+        if invoice_ids else []
+    )
+    customer_ids = {
+        invoice.customer_id for invoice in invoices
+        if invoice.customer_id is not None
+    }
+    customers = (
+        db.query(Contact).filter(Contact.id.in_(customer_ids)).all()
+        if customer_ids else []
+    )
+    customer_names = {customer.id: customer.name for customer in customers}
+    item_ids = {sale.item_id for sale in sales if sale.item_id is not None}
+    items = db.query(Item).filter(Item.id.in_(item_ids)).all() if item_ids else []
+    item_names = {item.id: item.name for item in items}
+
+    paid_by_invoice: dict[int, Decimal] = {}
+    methods_by_invoice: dict[int, set[str]] = {}
+    payment_totals: dict[str, Decimal] = {}
+    payment_counts: dict[str, int] = {}
+    for payment in payments:
+        amount = _decimal(payment.amount, "payment amount")
+        method = (payment.payment_method or "Unknown").strip().title()
+        paid_by_invoice[payment.invoice_id] = (
+            paid_by_invoice.get(payment.invoice_id, Decimal("0")) + amount
+        )
+        methods_by_invoice.setdefault(payment.invoice_id, set()).add(method)
+        payment_totals[method] = payment_totals.get(method, Decimal("0")) + amount
+        payment_counts[method] = payment_counts.get(method, 0) + 1
+
+    item_totals: dict[tuple[int, str], dict[str, Decimal | str]] = {}
+    for sale in sales:
+        item_id = sale.item_id or 0
+        price_type = (sale.price_type or "other").strip().lower()
+        key = (item_id, price_type)
+        row = item_totals.setdefault(key, {
+            "item_name": item_names.get(item_id, f"Item #{item_id}"),
+            "price_type": price_type.title(),
+            "quantity": Decimal("0"),
+            "total_amount": Decimal("0"),
+        })
+        row["quantity"] = row["quantity"] + _decimal(
+            sale.quantity or "0",
+            "sale quantity",
+        )
+        row["total_amount"] = row["total_amount"] + _decimal(
+            sale.total_price or "0",
+            "sale amount",
+        )
+
+    sale_rows = []
+    for invoice in invoices:
+        total = _decimal(invoice.total_price or "0", "invoice total")
+        paid = paid_by_invoice.get(invoice.id, Decimal("0"))
+        sale_rows.append({
+            "invoice_id": invoice.id,
+            "created_at": _timestamp(invoice.created_at),
+            "customer_name": customer_names.get(invoice.customer_id, "Walk-in customer"),
+            "status": invoice.status or "unknown",
+            "total_amount": str(total),
+            "amount_paid": str(paid),
+            "balance_due": str(max(total - paid, Decimal("0"))),
+            "payment_methods": sorted(methods_by_invoice.get(invoice.id, set())),
+        })
+
+    total_sales = sum(
+        (_decimal(invoice.total_price or "0", "invoice total") for invoice in invoices),
+        Decimal("0"),
+    )
+    total_vat = sum(
+        (_decimal(invoice.tax_amount or "0", "invoice tax") for invoice in invoices),
+        Decimal("0"),
+    )
+    total_paid = sum(paid_by_invoice.values(), Decimal("0"))
+    return {
+        "date_from": date_from.isoformat(),
+        "date_to": date_to.isoformat(),
+        "cashier_name": str(user.get("name") or user.get("username") or "Cashier"),
+        "transaction_count": len(invoices),
+        "total_sales": str(total_sales),
+        "vat": str(total_vat),
+        "total_paid": str(total_paid),
+        "balance_due": str(max(total_sales - total_paid, Decimal("0"))),
+        "sales": sale_rows,
+        "payment_methods": [
+            {
+                "payment_method": method,
+                "transaction_count": payment_counts[method],
+                "amount": str(payment_totals[method]),
+            }
+            for method in sorted(payment_totals)
+        ],
+        "items_sold": [
+            {
+                **row,
+                "quantity": str(row["quantity"]),
+                "total_amount": str(row["total_amount"]),
+            }
+            for _, row in sorted(
+                item_totals.items(),
+                key=lambda entry: (str(entry[1]["item_name"]).lower(), entry[0][1]),
+            )
+        ],
+    }
 
 
 @router.get("/dashboard", dependencies=[SALES_ACCESS])

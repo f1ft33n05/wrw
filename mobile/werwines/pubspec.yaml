@@ -60,7 +60,7 @@ flutter_launcher_icons:
   image_path: "assets/images/logo-plum.png"
   adaptive_icon_background: "#FFFFFF" # Hex color or path to background image
   adaptive_icon_foreground: "assets/images/logo-plum.png"
-  adaptive_icon_foreground_inset: 20
+  adaptive_icon_foreground_inset: 24
 
 # The following section is specific to Flutter packages.
 flutter:

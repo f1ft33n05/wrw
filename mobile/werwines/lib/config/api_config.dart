@@ -1,7 +1,7 @@
 class ApiConfig {
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.8.106:8000',
+    defaultValue: 'https://werwines.onrender.com/',
   );
   static const String currencyCode = String.fromEnvironment(
     'CURRENCY_CODE',

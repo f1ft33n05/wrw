@@ -37,6 +37,7 @@ void main() {
   ) async {
     Map<String, dynamic>? submittedSale;
     String? idempotencyKey;
+    final salesHistoryQueries = <Map<String, String>>[];
     final client = MockClient((request) async {
       final httpRequest = request;
       if (httpRequest.url.path == '/auth/token') {
@@ -97,6 +98,7 @@ void main() {
             200,
           );
         case '/sales/history':
+          salesHistoryQueries.add(request.url.queryParameters);
           return http.Response(
             jsonEncode({
               'sales': [
@@ -248,6 +250,15 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('nav-receipts')));
     await tester.pumpAndSettle();
     expect(find.text('Sale #44'), findsOneWidget);
+    expect(find.byKey(const ValueKey('export-sales-report')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('sales-period-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Yesterday').last);
+    await tester.pumpAndSettle();
+    expect(salesHistoryQueries, hasLength(2));
+    expect(salesHistoryQueries.last, containsPair('date_from', isNotEmpty));
+    expect(salesHistoryQueries.last, containsPair('date_to', isNotEmpty));
+    expect(find.text('Sale #44'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('sale-44')));
     await tester.pumpAndSettle();
     expect(find.text('Receipt #44'), findsOneWidget);
@@ -285,6 +296,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sale complete'), findsWidgets);
+    expect(find.byTooltip('Share receipt'), findsOneWidget);
+    expect(find.byTooltip('Print receipt'), findsOneWidget);
     expect(submittedSale?['amount_paid'], '20.00');
     expect(submittedSale?['event_id'], 3);
     expect(idempotencyKey, isNotEmpty);
