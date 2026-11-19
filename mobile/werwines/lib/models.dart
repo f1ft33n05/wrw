@@ -226,6 +226,151 @@ class SaleHistoryEntry {
   }
 }
 
+class SalesReport {
+  const SalesReport({
+    required this.dateFrom,
+    required this.dateTo,
+    required this.cashierName,
+    required this.transactionCount,
+    required this.totalSales,
+    required this.vat,
+    required this.totalPaid,
+    required this.balanceDue,
+    required this.sales,
+    required this.paymentMethods,
+    required this.itemsSold,
+  });
+
+  final String dateFrom;
+  final String dateTo;
+  final String cashierName;
+  final int transactionCount;
+  final double totalSales;
+  final double vat;
+  final double totalPaid;
+  final double balanceDue;
+  final List<SalesReportSale> sales;
+  final List<SalesReportPaymentMethod> paymentMethods;
+  final List<SalesReportItem> itemsSold;
+
+  factory SalesReport.fromJson(Map<String, dynamic> json) {
+    final sales = json['sales'];
+    final paymentMethods = json['payment_methods'];
+    final itemsSold = json['items_sold'];
+    if (sales is! List || paymentMethods is! List || itemsSold is! List) {
+      throw const FormatException('Invalid sales report response.');
+    }
+    return SalesReport(
+      dateFrom: _requiredString(json, 'date_from'),
+      dateTo: _requiredString(json, 'date_to'),
+      cashierName: _requiredString(json, 'cashier_name'),
+      transactionCount: _requiredInt(json, 'transaction_count'),
+      totalSales: _requiredNumber(json, 'total_sales'),
+      vat: _requiredNumber(json, 'vat'),
+      totalPaid: _requiredNumber(json, 'total_paid'),
+      balanceDue: _requiredNumber(json, 'balance_due'),
+      sales: sales
+          .map(
+            (sale) => SalesReportSale.fromJson(
+              Map<String, dynamic>.from(sale as Map),
+            ),
+          )
+          .toList(),
+      paymentMethods: paymentMethods
+          .map(
+            (method) => SalesReportPaymentMethod.fromJson(
+              Map<String, dynamic>.from(method as Map),
+            ),
+          )
+          .toList(),
+      itemsSold: itemsSold
+          .map(
+            (item) => SalesReportItem.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class SalesReportSale {
+  const SalesReportSale({
+    required this.invoiceId,
+    required this.createdAt,
+    required this.customerName,
+    required this.status,
+    required this.totalAmount,
+    required this.amountPaid,
+    required this.balanceDue,
+    required this.paymentMethods,
+  });
+
+  final int invoiceId;
+  final String? createdAt;
+  final String customerName;
+  final String status;
+  final double totalAmount;
+  final double amountPaid;
+  final double balanceDue;
+  final List<String> paymentMethods;
+
+  factory SalesReportSale.fromJson(Map<String, dynamic> json) =>
+      SalesReportSale(
+        invoiceId: _requiredInt(json, 'invoice_id'),
+        createdAt: json['created_at']?.toString(),
+        customerName: _requiredString(json, 'customer_name'),
+        status: _requiredString(json, 'status'),
+        totalAmount: _requiredNumber(json, 'total_amount'),
+        amountPaid: _requiredNumber(json, 'amount_paid'),
+        balanceDue: _requiredNumber(json, 'balance_due'),
+        paymentMethods: (json['payment_methods'] as List)
+            .map((method) => method.toString())
+            .toList(),
+      );
+}
+
+class SalesReportPaymentMethod {
+  const SalesReportPaymentMethod({
+    required this.name,
+    required this.transactionCount,
+    required this.amount,
+  });
+
+  final String name;
+  final int transactionCount;
+  final double amount;
+
+  factory SalesReportPaymentMethod.fromJson(Map<String, dynamic> json) =>
+      SalesReportPaymentMethod(
+        name: _requiredString(json, 'payment_method'),
+        transactionCount: _requiredInt(json, 'transaction_count'),
+        amount: _requiredNumber(json, 'amount'),
+      );
+}
+
+class SalesReportItem {
+  const SalesReportItem({
+    required this.name,
+    required this.priceType,
+    required this.quantity,
+    required this.totalAmount,
+  });
+
+  final String name;
+  final String priceType;
+  final double quantity;
+  final double totalAmount;
+
+  factory SalesReportItem.fromJson(Map<String, dynamic> json) =>
+      SalesReportItem(
+        name: _requiredString(json, 'item_name'),
+        priceType: _requiredString(json, 'price_type'),
+        quantity: _requiredNumber(json, 'quantity'),
+        totalAmount: _requiredNumber(json, 'total_amount'),
+      );
+}
+
 class SaleReceipt {
   const SaleReceipt({
     required this.invoiceId,

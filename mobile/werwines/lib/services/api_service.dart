@@ -178,8 +178,15 @@ class ApiService {
   Future<SalesHistoryPage> fetchSalesHistory({
     int offset = 0,
     int limit = 50,
+    String? dateFrom,
+    String? dateTo,
   }) async {
-    final data = await _get('/sales/history?offset=$offset&limit=$limit');
+    final query = <String, String>{'offset': '$offset', 'limit': '$limit'};
+    if (dateFrom != null) query['date_from'] = dateFrom;
+    if (dateTo != null) query['date_to'] = dateTo;
+    final data = await _get(
+      Uri(path: '/sales/history', queryParameters: query).toString(),
+    );
     if (data is! Map) {
       throw const ApiException(
         502,
@@ -187,6 +194,24 @@ class ApiService {
       );
     }
     return SalesHistoryPage.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  Future<SalesReport> fetchSalesReport({
+    required String dateFrom,
+    required String dateTo,
+  }) async {
+    final path = Uri(
+      path: '/sales/report/data',
+      queryParameters: {'date_from': dateFrom, 'date_to': dateTo},
+    ).toString();
+    final data = await _get(path);
+    if (data is! Map) {
+      throw const ApiException(
+        502,
+        'The server returned an invalid sales report.',
+      );
+    }
+    return SalesReport.fromJson(Map<String, dynamic>.from(data));
   }
 
   Future<SaleReceipt> fetchReceipt(int invoiceId) async {

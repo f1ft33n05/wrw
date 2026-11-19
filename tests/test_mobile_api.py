@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -23,7 +23,7 @@ from models import ProfileUpdateRequest
 from routes.account import mobile_profile, update_mobile_profile
 from routes.events import active_events
 from routes.items import list_catalogue
-from routes.sales import mobile_dashboard
+from routes.sales import mobile_dashboard, mobile_sales_report, sales_history
 
 
 @pytest.fixture
@@ -211,3 +211,102 @@ def test_mobile_dashboard_returns_local_day_totals_and_ten_recent_sales(db):
     assert result["transaction_count_today"] == 11
     assert len(result["recent_sales"]) == 10
     assert result["recent_sales"][0]["invoice_id"] == invoices[0].id
+
+
+def test_mobile_sales_report_filters_period_and_groups_payments_and_items(db):
+    item = Item(name="Pinotage")
+    db.add(item)
+    db.flush()
+    invoice = Invoices(
+        status="paid",
+        total_price="140.00",
+        tax_amount="20.00",
+        created_at="2026-11-18T10:00:00+02:00",
+    )
+    outside_period = Invoices(
+        status="paid",
+        total_price="90.00",
+        created_at="2026-11-17T10:00:00+02:00",
+    )
+    db.add_all([invoice, outside_period])
+    db.flush()
+    db.add_all([
+        SalesTxn(
+            invoice_id=invoice.id,
+            item_id=item.id,
+            quantity="2",
+            price_type="retail",
+            total_price="100.00",
+        ),
+        SalesTxn(
+            invoice_id=invoice.id,
+            item_id=item.id,
+            quantity="1",
+            price_type="wholesale",
+            total_price="40.00",
+        ),
+        SalesTxn(invoice_id=outside_period.id, item_id=item.id, quantity="1"),
+        Payments(
+            invoice_id=invoice.id,
+            amount="100.00",
+            payment_method="cash",
+            status="completed",
+        ),
+        Payments(
+            invoice_id=invoice.id,
+            amount="40.00",
+            payment_method="card",
+            status="completed",
+        ),
+    ])
+    db.commit()
+
+    report = asyncio.run(mobile_sales_report(
+        db,
+        {"name": "Cashier Casey"},
+        date(2026, 11, 18),
+        date(2026, 11, 18),
+    ))
+
+    assert report["cashier_name"] == "Cashier Casey"
+    assert report["transaction_count"] == 1
+    assert report["total_sales"] == "140.00"
+    assert report["vat"] == "20.00"
+    assert report["payment_methods"] == [
+        {"payment_method": "Card", "transaction_count": 1, "amount": "40.00"},
+        {"payment_method": "Cash", "transaction_count": 1, "amount": "100.00"},
+    ]
+    assert report["items_sold"] == [
+        {
+            "item_name": "Pinotage",
+            "price_type": "Retail",
+            "quantity": "2",
+            "total_amount": "100.00",
+        },
+        {
+            "item_name": "Pinotage",
+            "price_type": "Wholesale",
+            "quantity": "1",
+            "total_amount": "40.00",
+        },
+    ]
+    history = asyncio.run(sales_history(
+        db,
+        offset=0,
+        limit=50,
+        date_from=date(2026, 11, 18),
+        date_to=date(2026, 11, 18),
+    ))
+    assert [sale["invoice_id"] for sale in history["sales"]] == [invoice.id]
+
+
+def test_mobile_sales_report_rejects_reversed_period(db):
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(mobile_sales_report(
+            db,
+            {"name": "Cashier Casey"},
+            date(2026, 11, 19),
+            date(2026, 11, 18),
+        ))
+
+    assert error.value.status_code == 422

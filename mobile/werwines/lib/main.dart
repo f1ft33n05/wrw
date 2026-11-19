@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:printing/printing.dart';
 
 import 'models.dart';
 import 'screens/dashboard_screen.dart';
@@ -12,6 +13,7 @@ import 'screens/settings_screen.dart';
 import 'screens/settings_store.dart';
 import 'services/api_service.dart';
 import 'utils/formatting.dart';
+import 'utils/receipt_pdf.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,6 +83,11 @@ class _WerwinesAppState extends State<WerwinesApp> {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF291D34)),
         useMaterial3: true,
+        cardTheme: const CardThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(8)),
+          ),
+        ),
       ),
       home: _restoring
           ? const _LoadingScreen(message: 'Restoring session…')
@@ -416,6 +423,7 @@ class _CashierScreenState extends State<CashierScreen> {
           key: const ValueKey('pos-tab'),
           api: widget.api,
           eventId: _selectedEventId,
+          settingsStore: _settingsStore,
           onSignOut: widget.onSignOut,
         );
       case 3:
@@ -518,12 +526,14 @@ class PosScreen extends StatefulWidget {
     required this.api,
     required this.onSignOut,
     required this.eventId,
+    required this.settingsStore,
     super.key,
   });
 
   final ApiService api;
   final VoidCallback onSignOut;
   final int? eventId;
+  final AppSettingsStore settingsStore;
 
   @override
   State<PosScreen> createState() => _PosScreenState();
@@ -636,6 +646,7 @@ class _PosScreenState extends State<PosScreen> {
           quantities: Map<int, int>.from(_cart),
           customerId: _customerId,
           eventId: widget.eventId,
+          settingsStore: widget.settingsStore,
           onSignOut: widget.onSignOut,
         ),
       ),
@@ -730,14 +741,17 @@ class _PosScreenState extends State<PosScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          FilledButton.icon(
-                            key: const ValueKey('review-cart'),
-                            onPressed: _cart.isEmpty ? null : _checkout,
-                            icon: const Icon(Icons.shopping_cart_checkout),
-                            label: Text(
-                              itemCount == 0
-                                  ? 'Cart'
-                                  : 'Cart · $itemCount ${itemCount == 1 ? 'item' : 'items'}',
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              key: const ValueKey('review-cart'),
+                              onPressed: _cart.isEmpty ? null : _checkout,
+                              icon: const Icon(Icons.shopping_cart_checkout),
+                              label: Text(
+                                itemCount == 0
+                                    ? 'Review Cart'
+                                    : 'Review Cart · $itemCount ${itemCount == 1 ? 'item' : 'items'}',
+                              ),
                             ),
                           ),
                         ],
@@ -746,43 +760,96 @@ class _PosScreenState extends State<PosScreen> {
                     Expanded(
                       child: filteredItems.isEmpty
                           ? const Center(child: Text('No matching products.'))
-                          : ListView.builder(
+                          : GridView.builder(
                               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 8,
+                                    mainAxisSpacing: 8,
+                                    mainAxisExtent: 140,
+                                  ),
                               itemCount: filteredItems.length,
                               itemBuilder: (context, index) {
                                 final item = filteredItems[index];
                                 final inCart = _cart[item.id] ?? 0;
                                 final outOfStock = item.quantity <= 0;
                                 return Card(
-                                  child: ListTile(
-                                    title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                    subtitle: Text(
-                                      'Available: ${_formatQuantity(item.quantity)}'
-                                      '${item.barcode.isEmpty ? '' : ' · SKU: ${item.barcode}'}\n',
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      8,
+                                      5,
+                                      8,
+                                      4,
                                     ),
-                                    isThreeLine: true,
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        if (inCart > 0)
-                                          IconButton(
-                                            tooltip: 'Remove one ${item.name}',
-                                            onPressed: () =>
-                                                _changeQuantity(item.id, -1),
-                                            icon: const Icon(
-                                              Icons.remove_circle_outline,
+                                        Text(
+                                          item.name,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          formatMoney(item.retailPrice),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleSmall
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Available: ${_formatQuantity(item.quantity)}',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall,
+                                        ),
+                                        const Spacer(),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            if (inCart > 0)
+                                              IconButton(
+                                                tooltip:
+                                                    'Remove one ${item.name}',
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                onPressed: () =>
+                                                    _changeQuantity(
+                                                      item.id,
+                                                      -1,
+                                                    ),
+                                                icon: const Icon(
+                                                  Icons.remove_circle_outline,
+                                                ),
+                                              )
+                                            else
+                                              const SizedBox(width: 40),
+                                            IconButton(
+                                              tooltip: inCart > 0
+                                                  ? 'Add one ${item.name}'
+                                                  : 'Add ${item.name}',
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              onPressed: outOfStock
+                                                  ? null
+                                                  : () => _addItem(item),
+                                              icon: const Icon(
+                                                Icons.add_circle_outline,
+                                              ),
                                             ),
-                                          ),
-                                        IconButton(
-                                          tooltip: inCart > 0
-                                              ? 'Add one ${item.name}'
-                                              : 'Add ${item.name}',
-                                          onPressed: outOfStock
-                                              ? null
-                                              : () => _addItem(item),
-                                          icon: const Icon(
-                                            Icons.add_circle_outline,
-                                          ),
+                                          ],
                                         ),
                                       ],
                                     ),
@@ -807,6 +874,7 @@ class CheckoutScreen extends StatefulWidget {
     required this.customerId,
     required this.eventId,
     required this.onSignOut,
+    required this.settingsStore,
     super.key,
   });
 
@@ -816,6 +884,7 @@ class CheckoutScreen extends StatefulWidget {
   final int? customerId;
   final int? eventId;
   final VoidCallback onSignOut;
+  final AppSettingsStore settingsStore;
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -831,6 +900,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String _paymentMethod = 'cash';
   String? _idempotencyKey;
   String? _idempotencyPayload;
+  bool _receiptActionLoading = false;
 
   @override
   void initState() {
@@ -943,6 +1013,58 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return base64Url.encode(bytes).replaceAll('=', '');
   }
 
+  Future<void> _shareReceipt() => _runReceiptAction('share', (receipt) async {
+    final settings = await widget.settingsStore.read();
+    final bytes = await buildReceiptPdf(
+      receipt,
+      showCashierName: settings.showCashierName,
+    );
+    await Printing.sharePdf(
+      bytes: bytes,
+      filename: 'receipt-${receipt.invoiceId}.pdf',
+      subject: 'Receipt #${receipt.invoiceId}',
+    );
+  });
+
+  Future<void> _printReceipt() => _runReceiptAction('print', (receipt) async {
+    final settings = await widget.settingsStore.read();
+    await Printing.layoutPdf(
+      name: 'Receipt #${receipt.invoiceId}',
+      format: thermalReceiptPageFormat(receipt),
+      onLayout: (_) =>
+          buildReceiptPdf(receipt, showCashierName: settings.showCashierName),
+    );
+  });
+
+  Future<void> _runReceiptAction(
+    String action,
+    Future<void> Function(SaleReceipt receipt) run,
+  ) async {
+    setState(() => _receiptActionLoading = true);
+    try {
+      final receipt = await widget.api.fetchReceipt(_result!.invoiceId);
+      await run(receipt);
+    } on ApiException catch (error) {
+      if (error.statusCode == 401) {
+        widget.onSignOut();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not $action receipt: ${error.message}'),
+          ),
+        );
+      }
+    } on Exception catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not $action receipt: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _receiptActionLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final result = _result;
@@ -958,6 +1080,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ? _SaleConfirmation(
               result: result,
               onNewSale: () => Navigator.of(context).pop(true),
+              onShareReceipt: _shareReceipt,
+              onPrintReceipt: _printReceipt,
+              receiptActionLoading: _receiptActionLoading,
             )
           : _buildCheckoutForm(),
       bottomNavigationBar: !_loading && _quote != null && result == null
@@ -1070,10 +1195,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 }
 
 class _SaleConfirmation extends StatelessWidget {
-  const _SaleConfirmation({required this.result, required this.onNewSale});
+  const _SaleConfirmation({
+    required this.result,
+    required this.onNewSale,
+    required this.onShareReceipt,
+    required this.onPrintReceipt,
+    required this.receiptActionLoading,
+  });
 
   final SaleResult result;
   final VoidCallback onNewSale;
+  final VoidCallback onShareReceipt;
+  final VoidCallback onPrintReceipt;
+  final bool receiptActionLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -1101,11 +1235,29 @@ class _SaleConfirmation extends StatelessWidget {
             if (result.balanceDue > 0)
               _MoneyRow(label: 'Balance due', amount: result.balanceDue),
             const SizedBox(height: 24),
-            FilledButton.icon(
-              key: const ValueKey('new-sale'),
-              onPressed: onNewSale,
-              icon: const Icon(Icons.add_shopping_cart),
-              label: const Text('New Sale'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  key: const ValueKey('share-sale-receipt'),
+                  tooltip: 'Share receipt',
+                  onPressed: receiptActionLoading ? null : onShareReceipt,
+                  icon: const Icon(Icons.share_outlined),
+                ),
+                IconButton(
+                  key: const ValueKey('print-sale-receipt'),
+                  tooltip: 'Print receipt',
+                  onPressed: receiptActionLoading ? null : onPrintReceipt,
+                  icon: const Icon(Icons.print_outlined),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  key: const ValueKey('new-sale'),
+                  onPressed: onNewSale,
+                  icon: const Icon(Icons.add_shopping_cart),
+                  label: const Text('New Sale'),
+                ),
+              ],
             ),
           ],
         ),

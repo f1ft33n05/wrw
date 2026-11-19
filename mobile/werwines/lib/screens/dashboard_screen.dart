@@ -179,6 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: _SummaryCard(
                     key: const ValueKey('total-paid-today'),
+                    icon: Icons.trending_up,
                     label: 'Paid Sales',
                     value: formatMoney(_summary!.totalPaidToday),
                     color: theme.colorScheme.primary,
@@ -192,6 +193,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: _SummaryCard(
                     key: const ValueKey('transactions-today'),
+                    icon: Icons.receipt_long,
                     label: 'Transactions',
                     value: '${_summary!.transactionCountToday}',
                     color: theme.colorScheme.onSurface,
@@ -290,6 +292,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
+    required this.icon,
     required this.label,
     required this.value,
     required this.color,
@@ -300,6 +303,7 @@ class _SummaryCard extends StatelessWidget {
     super.key,
   });
 
+  final IconData icon;
   final String label;
   final String value;
   final Color color;
@@ -317,6 +321,8 @@ class _SummaryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Icon(icon, color: foreground),
+            const SizedBox(height: 8),
             Text(label, style: TextStyle(color: foreground)),
             const SizedBox(height: 12),
             Text(

@@ -5,6 +5,7 @@ import '../models.dart';
 import '../services/api_service.dart';
 import '../utils/formatting.dart';
 import '../utils/receipt_pdf.dart';
+import '../utils/sales_report_pdf.dart';
 import 'settings_store.dart';
 
 class SalesHistoryScreen extends StatefulWidget {
@@ -30,20 +31,29 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   int? _nextOffset;
   bool _loading = true;
   bool _loadingMore = false;
+  bool _exporting = false;
   String? _error;
+  int _requestGeneration = 0;
+  _SalesDateFilter _selectedFilter = _SalesDateFilter.today;
+  late DateTimeRange _selectedRange = _rangeForFilter(_SalesDateFilter.today);
 
   @override
   void initState() {
     super.initState();
+    _updateSelectedRange(_rangeForFilter(_selectedFilter));
     _loadPage(refresh: true);
   }
 
   Future<void> _loadPage({bool refresh = false}) async {
-    if (_loadingMore || (_loading && !refresh)) return;
+    if (_loadingMore && !refresh) return;
+    final requestGeneration = ++_requestGeneration;
     if (refresh) {
       setState(() {
         _loading = true;
+        _loadingMore = false;
         _error = null;
+        _sales.clear();
+        _nextOffset = null;
       });
     } else {
       setState(() {
@@ -55,10 +65,11 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     try {
       final page = await widget.api.fetchSalesHistory(
         offset: refresh ? 0 : _nextOffset ?? 0,
+        dateFrom: _dateOnly(_selectedRange.start),
+        dateTo: _dateOnly(_selectedRange.end),
       );
-      if (mounted) {
+      if (mounted && requestGeneration == _requestGeneration) {
         setState(() {
-          if (refresh) _sales.clear();
           _sales.addAll(page.sales);
           _nextOffset = page.nextOffset;
           _loading = false;
@@ -68,7 +79,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     } on ApiException catch (error) {
       if (error.statusCode == 401) {
         _returnToSignIn();
-      } else if (mounted) {
+      } else if (mounted && requestGeneration == _requestGeneration) {
         setState(() {
           _error = error.message;
           _loading = false;
@@ -76,7 +87,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
         });
       }
     } on Exception catch (error) {
-      if (mounted) {
+      if (mounted && requestGeneration == _requestGeneration) {
         setState(() {
           _error = error.toString();
           _loading = false;
@@ -89,6 +100,103 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   void _returnToSignIn() {
     widget.onSignOut();
     Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  DateTimeRange _rangeForFilter(_SalesDateFilter filter) {
+    final today = DateUtils.dateOnly(DateTime.now());
+    switch (filter) {
+      case _SalesDateFilter.today:
+        return DateTimeRange(start: today, end: today);
+      case _SalesDateFilter.yesterday:
+        final yesterday = today.subtract(const Duration(days: 1));
+        return DateTimeRange(start: yesterday, end: yesterday);
+      case _SalesDateFilter.last7Days:
+        return DateTimeRange(
+          start: today.subtract(const Duration(days: 6)),
+          end: today,
+        );
+      case _SalesDateFilter.lastMonth:
+        final firstDayOfThisMonth = DateTime(today.year, today.month);
+        final lastDayOfLastMonth = firstDayOfThisMonth.subtract(
+          const Duration(days: 1),
+        );
+        return DateTimeRange(
+          start: DateTime(lastDayOfLastMonth.year, lastDayOfLastMonth.month),
+          end: lastDayOfLastMonth,
+        );
+      case _SalesDateFilter.custom:
+        return _selectedRange;
+    }
+  }
+
+  void _updateSelectedRange(DateTimeRange range) {
+    _selectedRange = DateTimeRange(
+      start: DateUtils.dateOnly(range.start),
+      end: DateUtils.dateOnly(range.end),
+    );
+  }
+
+  Future<void> _onFilterChanged(_SalesDateFilter? filter) async {
+    if (filter == null) return;
+    final previousFilter = _selectedFilter;
+    if (filter == _SalesDateFilter.custom) {
+      setState(() => _selectedFilter = filter);
+      final range = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(2000),
+        lastDate: DateUtils.dateOnly(DateTime.now()),
+        initialDateRange: _selectedRange,
+      );
+      if (!mounted) return;
+      if (range == null) {
+        setState(() => _selectedFilter = previousFilter);
+        return;
+      }
+      setState(() {
+        _selectedFilter = filter;
+        _updateSelectedRange(range);
+      });
+    } else {
+      setState(() {
+        _selectedFilter = filter;
+        _updateSelectedRange(_rangeForFilter(filter));
+      });
+    }
+    await _loadPage(refresh: true);
+  }
+
+  Future<void> _exportReport() async {
+    setState(() => _exporting = true);
+    try {
+      final report = await widget.api.fetchSalesReport(
+        dateFrom: _dateOnly(_selectedRange.start),
+        dateTo: _dateOnly(_selectedRange.end),
+      );
+      final pdf = await buildSalesReportPdf(report);
+      await Printing.sharePdf(
+        bytes: pdf,
+        filename: 'sales-report-${report.dateFrom}-to-${report.dateTo}.pdf',
+        subject: 'Cash-Up Slip ${report.dateFrom} to ${report.dateTo}',
+      );
+    } on ApiException catch (error) {
+      if (error.statusCode == 401) {
+        _returnToSignIn();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not export sales report: ${error.message}'),
+          ),
+        );
+      }
+    } on Exception catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not export sales report: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
   }
 
   Future<void> _openReceipt(SaleHistoryEntry sale) async {
@@ -119,82 +227,162 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
                 ),
               ],
             ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _sales.isEmpty && _error != null
-          ? _HistoryError(
-              message: _error!,
-              onRetry: () => _loadPage(refresh: true),
-            )
-          : _sales.isEmpty
-          ? const Center(child: Text('No sales yet.'))
-          : RefreshIndicator(
-              onRefresh: () => _loadPage(refresh: true),
-              child: ListView.separated(
-                padding: const EdgeInsets.all(12),
-                itemCount: _sales.length + 1,
-                separatorBuilder: (_, _) => const SizedBox(height: 4),
-                itemBuilder: (context, index) {
-                  if (index == _sales.length) {
-                    if (_error != null) {
-                      return _HistoryError(
-                        message: _error!,
-                        onRetry: _loadPage,
-                      );
-                    }
-                    if (_nextOffset == null) {
-                      return const SizedBox(height: 12);
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Center(
-                        child: OutlinedButton(
-                          onPressed: _loadingMore ? null : _loadPage,
-                          child: _loadingMore
-                              ? const SizedBox(
-                                  height: 18,
-                                  width: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text('Load older sales'),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<_SalesDateFilter>(
+                        key: const ValueKey('sales-period-filter'),
+                        initialValue: _selectedFilter,
+                        decoration: const InputDecoration(
+                          labelText: 'Sales period',
+                          border: OutlineInputBorder(),
+                          isDense: true,
                         ),
+                        items: _SalesDateFilter.values
+                            .map(
+                              (filter) => DropdownMenuItem(
+                                value: filter,
+                                child: Text(filter.label),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: _loading ? null : _onFilterChanged,
                       ),
-                    );
-                  }
-
-                  final sale = _sales[index];
-                  return Card(
-                    child: ListTile(
-                      key: ValueKey('sale-${sale.invoiceId}'),
-                      title: Text(
-                        'Sale #${sale.invoiceId}',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '${sale.customerName}\n'
-                        '${_formatDate(sale.createdAt)} · '
-                        '${sale.itemCount} ${sale.itemCount == 1 ? 'item' : 'items'} · '
-                        '${sale.status.replaceAll('_', ' ')}',
-                      ),
-                      isThreeLine: true,
-                      trailing: Text(
-                        formatMoney(sale.totalAmount),
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      onTap: () => _openReceipt(sale),
                     ),
-                  );
-                },
-              ),
+                    const SizedBox(width: 8),
+                    FilledButton.tonalIcon(
+                      key: const ValueKey('export-sales-report'),
+                      onPressed: _loading || _sales.isEmpty || _exporting
+                          ? null
+                          : _exportReport,
+                      icon: _exporting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.ios_share),
+                      label: const Text('Export'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${_dateOnly(_selectedRange.start)} - '
+                    '${_dateOnly(_selectedRange.end)}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              ],
             ),
+          ),
+          Expanded(child: _buildSalesList()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSalesList() {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_sales.isEmpty && _error != null) {
+      return _HistoryError(
+        message: _error!,
+        onRetry: () => _loadPage(refresh: true),
+      );
+    }
+    if (_sales.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: () => _loadPage(refresh: true),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(height: 100),
+            Center(child: Text('No sales found for this period.')),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: () => _loadPage(refresh: true),
+      child: ListView.separated(
+        padding: const EdgeInsets.all(12),
+        itemCount: _sales.length + 1,
+        separatorBuilder: (_, _) => const SizedBox(height: 4),
+        itemBuilder: (context, index) {
+          if (index == _sales.length) {
+            if (_error != null) {
+              return _HistoryError(message: _error!, onRetry: _loadPage);
+            }
+            if (_nextOffset == null) return const SizedBox(height: 12);
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: OutlinedButton(
+                  onPressed: _loadingMore ? null : _loadPage,
+                  child: _loadingMore
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Load older sales'),
+                ),
+              ),
+            );
+          }
+          final sale = _sales[index];
+          return Card(
+            child: ListTile(
+              key: ValueKey('sale-${sale.invoiceId}'),
+              title: Text(
+                'Sale #${sale.invoiceId}',
+                style: Theme.of(context).textTheme.titleMedium
+                    ?.copyWith(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                '${sale.customerName}\n'
+                '${_formatDate(sale.createdAt)} · '
+                '${sale.itemCount} ${sale.itemCount == 1 ? 'item' : 'items'} · '
+                '${sale.status.replaceAll('_', ' ')}',
+              ),
+              isThreeLine: true,
+              trailing: Text(
+                formatMoney(sale.totalAmount),
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              onTap: () => _openReceipt(sale),
+            ),
+          );
+        },
+      ),
     );
   }
 }
+
+enum _SalesDateFilter {
+  today('Today'),
+  yesterday('Yesterday'),
+  last7Days('Last 7 days'),
+  lastMonth('Last month'),
+  custom('Custom range');
+
+  const _SalesDateFilter(this.label);
+
+  final String label;
+}
+
+String _dateOnly(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
 
 class SaleReceiptScreen extends StatefulWidget {
   const SaleReceiptScreen({
