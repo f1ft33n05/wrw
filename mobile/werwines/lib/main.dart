@@ -1022,14 +1022,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     await Printing.sharePdf(
       bytes: bytes,
       filename: 'receipt-${receipt.receiptNumber}.pdf',
-      subject: 'Receipt #${receipt.receiptNumber}',
+      subject: receipt.receiptNumber,
     );
   });
 
   Future<void> _printReceipt() => _runReceiptAction('print', (receipt) async {
     final settings = await widget.settingsStore.read();
     await Printing.layoutPdf(
-      name: 'Receipt #${receipt.receiptNumber}',
+      name: receipt.receiptNumber,
       format: thermalReceiptPageFormat(receipt),
       onLayout: (_) =>
           buildReceiptPdf(receipt, showCashierName: settings.showCashierName),
@@ -1228,7 +1228,7 @@ class _SaleConfirmation extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 20),
-            _MoneyRow(label: 'Receipt #', receiptNumber: result.receiptNumber),
+            _MoneyRow(label: 'Receipt #:', receiptNumber: result.receiptNumber),
             _MoneyRow(label: 'Total', amount: result.totalAmount),
             _MoneyRow(label: 'Paid', amount: result.amountPaid),
             _MoneyRow(label: 'Change', amount: result.changeAmount),

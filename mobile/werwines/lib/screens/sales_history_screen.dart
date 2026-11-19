@@ -176,7 +176,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       await Printing.sharePdf(
         bytes: pdf,
         filename: 'sales-report-${report.dateFrom}-to-${report.dateTo}.pdf',
-        subject: 'Cash-Up Slip ${report.dateFrom} to ${report.dateTo}',
+        subject: 'Sales Report From ${report.dateFrom} to ${report.dateTo}',
       );
     } on ApiException catch (error) {
       if (error.statusCode == 401) {
@@ -343,7 +343,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             child: ListTile(
               key: ValueKey('sale-${sale.invoiceId}'),
               title: Text(
-                'Sale #${sale.receiptNumber}',
+                sale.receiptNumber,
                 style: Theme.of(context).textTheme.titleMedium
                     ?.copyWith(fontSize: 14, fontWeight: FontWeight.bold),
               ),
@@ -470,7 +470,7 @@ class _SaleReceiptScreenState extends State<SaleReceiptScreen> {
       await Printing.sharePdf(
         bytes: bytes,
         filename: 'receipt-${receipt.receiptNumber}.pdf',
-        subject: 'Receipt #${receipt.receiptNumber}',
+        subject: receipt.receiptNumber,
       );
     });
   }
@@ -478,7 +478,7 @@ class _SaleReceiptScreenState extends State<SaleReceiptScreen> {
   Future<void> _printReceipt(SaleReceipt receipt) async {
     await _runReceiptAction('print', () async {
       await Printing.layoutPdf(
-        name: 'Receipt #${receipt.receiptNumber}',
+        name: receipt.receiptNumber,
         format: thermalReceiptPageFormat(receipt),
         onLayout: (_) => buildReceiptPdf(
           receipt,
@@ -511,7 +511,7 @@ class _SaleReceiptScreenState extends State<SaleReceiptScreen> {
     final receipt = _receipt;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Receipt #${receipt?.receiptNumber ?? widget.invoiceId}'),
+        title: Text(receipt?.receiptNumber ?? widget.invoiceId.toString()),
         actions: [
           IconButton(
             tooltip: 'Share receipt',
@@ -555,7 +555,7 @@ class _SaleReceiptScreenState extends State<SaleReceiptScreen> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           Text(
-            'Sale #${receipt.receiptNumber}',
+            receipt.receiptNumber,
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),
