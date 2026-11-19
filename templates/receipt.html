@@ -25,7 +25,7 @@
           <p>+265 (0) 999 123 456</p>
         </div>
         <div class="receipt-metadata">
-          <h3>Receipt #: {{ invoice.id }}</h3>
+          <h3>Receipt #: {{ receipt_number }}</h3>
           <h3>Date: {{ invoice_created_at }}</h3>
           {% if cashier %}<h3>Cashier: {{ cashier }}</h3>{% endif %}
           <h3>Customer: {{ customer.name if customer else "Walk-in customer" }}{% if customer and customer.phone %} - {{ customer.phone }}{% endif %}</h3>

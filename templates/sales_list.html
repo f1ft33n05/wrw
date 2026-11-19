@@ -172,7 +172,7 @@
               data-total="{{ sale.total }}"
               data-paid="{{ sale.paid }}"
               data-balance="{{ sale.balance_due }}">
-              <td>#{{ sale.invoice.id }}</td>
+              <td>{{ sale.invoice_number }}</td>
               <td>{{ sale.customer_name or "Walk-in customer" }}</td>
               <td>{{ sale.event_name or "Store" }}</td>
               <td>{{ sale.created_at or "N/A" }}</td>

@@ -37,6 +37,7 @@ from config import APP_TIMEZONE as CONFIGURED_TIMEZONE
 from config import CURRENCY_CODE
 from idempotency import get_cached_response, require_idempotency_key, save_response
 from event_stock import return_expired_event_stock
+from document_numbering import display_document_number, next_document_number
 
 
 router = APIRouter(prefix="/sales", tags=["sales"])
@@ -601,6 +602,12 @@ async def sales_history(
         paid = paid_by_invoice.get(invoice.id, Decimal("0"))
         history.append({
             "invoice_id": invoice.id,
+            "invoice_number": display_document_number(
+                invoice.document_number, "INV", invoice.created_at, invoice.id
+            ),
+            "receipt_number": display_document_number(
+                invoice.receipt_number, "RCT", invoice.created_at, invoice.id
+            ),
             "created_at": _timestamp(invoice.created_at),
             "customer_name": customer_names.get(
                 invoice.customer_id,
@@ -687,6 +694,25 @@ async def mobile_sales_report(
     item_ids = {sale.item_id for sale in sales if sale.item_id is not None}
     items = db.query(Item).filter(Item.id.in_(item_ids)).all() if item_ids else []
     item_names = {item.id: item.name for item in items}
+    invoice_lines_by_item: dict[tuple[int, int], dict] = {}
+    for invoice in invoices:
+        try:
+            invoice_lines = json.loads(invoice.items or "[]")
+        except (TypeError, ValueError) as exc:
+            raise HTTPException(
+                status_code=500,
+                detail="Sales report item data is invalid",
+            ) from exc
+        if not isinstance(invoice_lines, list) or any(
+            not isinstance(line, dict) for line in invoice_lines
+        ):
+            raise HTTPException(
+                status_code=500,
+                detail="Sales report item data is invalid",
+            )
+        for line in invoice_lines:
+            if "item_id" in line:
+                invoice_lines_by_item[(invoice.id, line["item_id"])] = line
 
     paid_by_invoice: dict[int, Decimal] = {}
     methods_by_invoice: dict[int, set[str]] = {}
@@ -702,21 +728,36 @@ async def mobile_sales_report(
         payment_totals[method] = payment_totals.get(method, Decimal("0")) + amount
         payment_counts[method] = payment_counts.get(method, 0) + 1
 
-    item_totals: dict[tuple[int, str], dict[str, Decimal | str]] = {}
+    item_totals: dict[int, dict[str, object]] = {}
     for sale in sales:
         item_id = sale.item_id or 0
-        price_type = (sale.price_type or "other").strip().lower()
-        key = (item_id, price_type)
-        row = item_totals.setdefault(key, {
+        row = item_totals.setdefault(item_id, {
             "item_name": item_names.get(item_id, f"Item #{item_id}"),
-            "price_type": price_type.title(),
-            "quantity": Decimal("0"),
+            "quantities_by_type": {},
             "total_amount": Decimal("0"),
         })
-        row["quantity"] = row["quantity"] + _decimal(
-            sale.quantity or "0",
-            "sale quantity",
+        quantities_by_type = row["quantities_by_type"]
+        snapshot = invoice_lines_by_item.get((sale.invoice_id, item_id), {})
+        has_price_split = (
+            "retail_quantity" in snapshot or "wholesale_quantity" in snapshot
         )
+        if has_price_split:
+            for price_type, field in (
+                ("Retail", "retail_quantity"),
+                ("Wholesale", "wholesale_quantity"),
+            ):
+                quantity = _decimal(snapshot.get(field, "0"), field)
+                if quantity > 0:
+                    quantities_by_type[price_type] = (
+                        quantities_by_type.get(price_type, Decimal("0"))
+                        + quantity
+                    )
+        else:
+            price_type = (sale.price_type or "other").strip().title()
+            quantities_by_type[price_type] = quantities_by_type.get(
+                price_type,
+                Decimal("0"),
+            ) + _decimal(sale.quantity or "0", "sale quantity")
         row["total_amount"] = row["total_amount"] + _decimal(
             sale.total_price or "0",
             "sale amount",
@@ -766,13 +807,16 @@ async def mobile_sales_report(
         ],
         "items_sold": [
             {
-                **row,
-                "quantity": str(row["quantity"]),
+                "item_name": row["item_name"],
+                "quantities_by_type": {
+                    price_type: str(quantity)
+                    for price_type, quantity in row["quantities_by_type"].items()
+                },
                 "total_amount": str(row["total_amount"]),
             }
             for _, row in sorted(
                 item_totals.items(),
-                key=lambda entry: (str(entry[1]["item_name"]).lower(), entry[0][1]),
+                key=lambda entry: str(entry[1]["item_name"]).lower(),
             )
         ],
     }
@@ -880,6 +924,9 @@ async def sales_list(request: Request, user: user_dependency, db: db_dependency)
         sales.append(
             {
                 "invoice": invoice,
+                "invoice_number": display_document_number(
+                    invoice.document_number, "INV", invoice.created_at, invoice.id
+                ),
                 "customer_id": str(invoice.customer_id) if invoice.customer_id is not None else "walk-in",
                 "customer_name": customer.name if customer is not None else None,
                 "event_id": str(invoice.event_id) if invoice.event_id is not None else "store",
@@ -954,7 +1001,9 @@ async def sales_receipts(request: Request, user: user_dependency, db: db_depende
         if invoice.created_at is not None:
             rows.append({
                 "id": invoice.id,
-                "document_number": invoice.document_number or f"INV-{invoice.id}",
+                "document_number": display_document_number(
+                    invoice.receipt_number, "RCT", invoice.created_at, invoice.id
+                ),
                 "customer": customers.get(invoice.customer_id, "Walk-in customer"),
                 "created_at": _display_timestamp(invoice.created_at),
                 "total": _decimal(invoice.total_price, "invoice total"),
@@ -1000,7 +1049,13 @@ async def sales_payments(request: Request, user: user_dependency, db: db_depende
         invoice = invoices.get(payment.invoice_id)
         rows.append({
             "id": payment.id,
-            "invoice_number": invoice.document_number if invoice and invoice.document_number else f"INV-{payment.invoice_id}",
+            "invoice_number": (
+                display_document_number(
+                    invoice.document_number, "INV", invoice.created_at, invoice.id
+                )
+                if invoice
+                else f"INV-{payment.invoice_id}"
+            ),
             "customer": customers.get(invoice.customer_id, "Walk-in customer") if invoice else "Walk-in customer",
             "amount": _decimal(payment.amount, "payment amount"),
             "payment_method": payment.payment_method,
@@ -1043,9 +1098,23 @@ async def sales_returns_page(
         lines = _returnable_lines(db, selected_invoice)
         if not lines:
             raise HTTPException(status_code=404, detail="Sale has no returnable items")
+    receipt_numbers = {
+        invoice.id: display_document_number(
+            invoice.receipt_number, "RCT", invoice.created_at, invoice.id
+        )
+        for invoice in invoices
+    }
+    if selected_invoice is not None:
+        receipt_numbers[selected_invoice.id] = display_document_number(
+            selected_invoice.receipt_number,
+            "RCT",
+            selected_invoice.created_at,
+            selected_invoice.id,
+        )
     return templates.TemplateResponse(request, "sales_returns.html", {
         "user": user,
         "invoices": invoices,
+        "receipt_numbers": receipt_numbers,
         "selected_invoice": selected_invoice,
         "lines": lines,
     })
@@ -1371,6 +1440,9 @@ async def pos_screen(
     recent_transactions = [
         {
             "id": invoice.id,
+            "receipt_number": display_document_number(
+                invoice.receipt_number, "RCT", invoice.created_at, invoice.id
+            ),
             "customer": recent_customers.get(invoice.customer_id, "Walk-in customer"),
             "created_at": _display_timestamp(invoice.created_at),
             "total": _decimal(invoice.total_price, "invoice total"),
@@ -1518,6 +1590,16 @@ async def create_sale(
             customer_id=checkout.customer_id,
             event_id=checkout.event_id,
             created_by=current_user["id"],
+            document_number=(
+                None
+                if checkout.save_draft
+                else next_document_number(db, Invoices, "document_number", "INV")
+            ),
+            receipt_number=(
+                None
+                if checkout.save_draft
+                else next_document_number(db, Invoices, "receipt_number", "RCT")
+            ),
             items=json.dumps(invoice_lines),
             subtotal=str(subtotal),
             discount_amount=str(total_discount),
@@ -1600,6 +1682,12 @@ async def create_sale(
         response = {
             "message": "Sale created successfully",
             "invoice_id": invoice.id,
+            "invoice_number": display_document_number(
+                invoice.document_number, "INV", invoice.created_at, invoice.id
+            ),
+            "receipt_number": display_document_number(
+                invoice.receipt_number, "RCT", invoice.created_at, invoice.id
+            ),
             "total_amount": str(total),
             "tendered_amount": str(tendered_amount),
             "amount_paid": str(amount_paid),
@@ -1668,6 +1756,14 @@ async def record_payment(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Invoice not found",
+            )
+        if invoice.document_number is None:
+            invoice.document_number = next_document_number(
+                db, Invoices, "document_number", "INV"
+            )
+        if invoice.receipt_number is None:
+            invoice.receipt_number = next_document_number(
+                db, Invoices, "receipt_number", "RCT"
             )
         total = _decimal(invoice.total_price, "invoice total")
         paid = _paid_total(db, invoice.id)
@@ -1836,6 +1932,12 @@ async def receipt_data(invoice_id: int, db: db_dependency):
 
     return {
         "invoice_id": invoice.id,
+        "invoice_number": display_document_number(
+            invoice.document_number, "INV", invoice.created_at, invoice.id
+        ),
+        "receipt_number": display_document_number(
+            invoice.receipt_number, "RCT", invoice.created_at, invoice.id
+        ),
         "status": invoice.status,
         "created_at": _timestamp(invoice.created_at),
         "customer_name": customer.name if customer else "Walk-in customer",
@@ -1970,6 +2072,9 @@ async def receipt(
         {
             "user": user,
             "invoice": invoice,
+            "receipt_number": display_document_number(
+                invoice.receipt_number, "RCT", invoice.created_at, invoice.id
+            ),
             "invoice_created_at": _display_timestamp(invoice.created_at),
             "customer": customer,
             "event": event,

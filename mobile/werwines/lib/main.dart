@@ -1021,15 +1021,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
     await Printing.sharePdf(
       bytes: bytes,
-      filename: 'receipt-${receipt.invoiceId}.pdf',
-      subject: 'Receipt #${receipt.invoiceId}',
+      filename: 'receipt-${receipt.receiptNumber}.pdf',
+      subject: 'Receipt #${receipt.receiptNumber}',
     );
   });
 
   Future<void> _printReceipt() => _runReceiptAction('print', (receipt) async {
     final settings = await widget.settingsStore.read();
     await Printing.layoutPdf(
-      name: 'Receipt #${receipt.invoiceId}',
+      name: 'Receipt #${receipt.receiptNumber}',
       format: thermalReceiptPageFormat(receipt),
       onLayout: (_) =>
           buildReceiptPdf(receipt, showCashierName: settings.showCashierName),
@@ -1228,7 +1228,7 @@ class _SaleConfirmation extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 20),
-            _MoneyRow(label: 'Receipt #', receiptId: result.invoiceId),
+            _MoneyRow(label: 'Receipt #', receiptNumber: result.receiptNumber),
             _MoneyRow(label: 'Total', amount: result.totalAmount),
             _MoneyRow(label: 'Paid', amount: result.amountPaid),
             _MoneyRow(label: 'Change', amount: result.changeAmount),
@@ -1270,13 +1270,13 @@ class _MoneyRow extends StatelessWidget {
   const _MoneyRow({
     required this.label,
     this.amount,
-    this.receiptId,
+    this.receiptNumber,
     this.emphasized = false,
   });
 
   final String label;
   final double? amount;
-  final int? receiptId;
+  final String? receiptNumber;
   final bool emphasized;
 
   @override
@@ -1291,10 +1291,7 @@ class _MoneyRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: style),
-          Text(
-            receiptId != null ? '#$receiptId' : formatMoney(amount ?? 0),
-            style: style,
-          ),
+          Text(receiptNumber ?? formatMoney(amount ?? 0), style: style),
         ],
       ),
     );

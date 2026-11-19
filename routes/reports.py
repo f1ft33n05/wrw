@@ -13,6 +13,7 @@ from openpyxl.utils import get_column_letter
 from starlette import status
 
 from database import db_dependency
+from document_numbering import display_document_number
 from database_models import (
     Contact,
     Invoices,
@@ -178,7 +179,9 @@ def sales_data(db, date_from, date_to):
             continue
         rows.append({
             "Date": report_date(invoice.created_at),
-            "Invoice": invoice.document_number or str(invoice.id),
+            "Invoice": display_document_number(
+                invoice.document_number, "INV", invoice.created_at, invoice.id
+            ),
             "Customer": customers.get(invoice.customer_id, "Walk-in customer"),
             "Total": money(invoice.total_price),
             "Status": (invoice.status or "").replace("_", " ").title(),

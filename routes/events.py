@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from database import db_dependency
+from document_numbering import display_document_number
 from database_models import (
     EventStockAllocation,
     Events,
@@ -324,6 +325,12 @@ async def event_detail(event_id: int, request: Request, user: user_dependency, d
             "user": user,
             "event": event,
             "invoices": invoices,
+            "invoice_numbers": {
+                invoice.id: display_document_number(
+                    invoice.document_number, "INV", invoice.created_at, invoice.id
+                )
+                for invoice in invoices
+            },
             "invoice_count": len(invoices),
             "total_sales": total_sales,
             "total_collected": total_collected,

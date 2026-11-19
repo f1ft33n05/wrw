@@ -42,7 +42,7 @@ Future<Uint8List> buildReceiptPdf(
           _centered('info@wearewines.com'),
           _centered('+265 (0) 999 123 456'),
           pw.SizedBox(height: 4 * PdfPageFormat.mm),
-          _metadata('Receipt #', '${receipt.invoiceId}'),
+          _metadata('Receipt #', receipt.receiptNumber),
           _metadata('Date', _formatReceiptDate(receipt.createdAt)),
           if (showCashierName && receipt.cashierName != null)
             _metadata('Cashier', receipt.cashierName!),

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 
 from decimal import Decimal
 
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from starlette.requests import Request
 
+from config import APP_TIMEZONE
 from database_models import Base, Contact, Invoices, Item, ItemCategory, ItemDiscount, SalesTxn
 from models import CheckoutRequest, DiscountRequest
 from routes import items, sales
@@ -167,6 +169,9 @@ def test_checkout_manual_customer_and_item_discounts(db):
         value=Decimal("5"),
         customer_id=customer.id,
     )
+    year = datetime.now(APP_TIMEZONE).year
+    assert manual.document_number == f"INV-{year}-00001"
+    assert manual.receipt_number == f"RCT-{year}-00001"
     assert Decimal(manual.subtotal) == Decimal("100.00")
     assert Decimal(manual.discount_amount) == Decimal("5.00")
     assert Decimal(manual.total_price) == Decimal("95.00")
