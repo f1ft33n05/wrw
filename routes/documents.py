@@ -11,9 +11,9 @@ from database import db_dependency
 from database_models import Contact, Invoices, Item, Payments, Quotations
 from models import DocumentRequest, Role
 from routes.auth import RoleChecker, get_current_user
-from routes.settings import get_settings
 from routes.ledger_utils import decimal_value, format_money, money
 from config import CURRENCY_CODE
+from document_numbering import display_document_number, next_document_number
 
 
 router = APIRouter(tags=["documents"])
@@ -21,19 +21,6 @@ templates = Jinja2Templates(directory="templates")
 templates.env.filters["money"] = format_money
 user_dependency = Annotated[dict, Depends(get_current_user)]
 DOCUMENT_ACCESS = Depends(RoleChecker(Role.admin, Role.manager))
-
-
-def _document_number(db, prefix: str, model) -> str:
-    year = datetime.now(timezone.utc).strftime("%Y")
-    highest = 0
-    for row in db.query(model).filter(model.document_number.isnot(None)).all():
-        number = row.document_number or ""
-        if number.startswith(f"{prefix}-{year}-"):
-            try:
-                highest = max(highest, int(number.rsplit("-", 1)[-1]))
-            except ValueError:
-                pass
-    return f"{prefix}-{year}-{highest + 1:04d}"
 
 
 def _line_snapshot(db, line) -> dict:
@@ -109,6 +96,10 @@ async def quotations_page(request: Request, user: user_dependency, db: db_depend
     return templates.TemplateResponse(request, "document_list.html", {
         "user": user, "document_type": "quotation", "documents": quotations,
         "items": items, "customers": customers, "customer_names": customer_names,
+        "document_numbers": {
+            row.id: display_document_number(row.document_number, "QT", row.created_at, row.id)
+            for row in quotations
+        },
     })
 
 
@@ -122,7 +113,7 @@ async def create_quotation(payload: DocumentRequest, user: user_dependency, db: 
     timestamp = datetime.now(timezone.utc).isoformat()
     quotation = Quotations(
         customer_id=payload.customer_id,
-        document_number=payload.document_number or _document_number(db, get_settings(db)["quotation_prefix"], Quotations),
+        document_number=next_document_number(db, Quotations, "document_number", "QT"),
         issue_date=payload.issue_date,
         expiry_date=payload.expiry_date,
         notes=payload.notes,
@@ -141,7 +132,12 @@ async def create_quotation(payload: DocumentRequest, user: user_dependency, db: 
     db.add(quotation)
     db.commit()
     db.refresh(quotation)
-    return {"message": "Quotation created", "id": quotation.id, "print_url": f"/quotations/{quotation.id}/print"}
+    return {
+        "message": "Quotation created",
+        "id": quotation.id,
+        "document_number": quotation.document_number,
+        "print_url": f"/quotations/{quotation.id}/print",
+    }
 
 
 @router.get("/invoices", response_class=HTMLResponse, dependencies=[DOCUMENT_ACCESS])
@@ -153,6 +149,10 @@ async def invoices_page(request: Request, user: user_dependency, db: db_dependen
     return templates.TemplateResponse(request, "document_list.html", {
         "user": user, "document_type": "invoice", "documents": invoices,
         "items": items, "customers": customers, "customer_names": customer_names,
+        "document_numbers": {
+            row.id: display_document_number(row.document_number, "INV", row.created_at, row.id)
+            for row in invoices
+        },
     })
 
 
@@ -166,7 +166,7 @@ async def create_invoice(payload: DocumentRequest, user: user_dependency, db: db
     timestamp = datetime.now(timezone.utc).isoformat()
     invoice = Invoices(
         customer_id=payload.customer_id,
-        document_number=payload.document_number or _document_number(db, get_settings(db)["invoice_prefix"], Invoices),
+        document_number=next_document_number(db, Invoices, "document_number", "INV"),
         issue_date=payload.issue_date,
         due_date=payload.due_date,
         notes=payload.notes,
@@ -185,7 +185,12 @@ async def create_invoice(payload: DocumentRequest, user: user_dependency, db: db
     db.add(invoice)
     db.commit()
     db.refresh(invoice)
-    return {"message": "Invoice created", "id": invoice.id, "print_url": f"/invoices/{invoice.id}/print"}
+    return {
+        "message": "Invoice created",
+        "id": invoice.id,
+        "document_number": invoice.document_number,
+        "print_url": f"/invoices/{invoice.id}/print",
+    }
 
 
 @router.post("/quotations/{quotation_id}/convert", dependencies=[DOCUMENT_ACCESS])
@@ -196,7 +201,7 @@ async def convert_quotation(quotation_id: int, user: user_dependency, db: db_dep
     timestamp = datetime.now(timezone.utc).isoformat()
     invoice = Invoices(
         customer_id=quotation.customer_id,
-        document_number=_document_number(db, get_settings(db)["invoice_prefix"], Invoices),
+        document_number=next_document_number(db, Invoices, "document_number", "INV"),
         issue_date=datetime.now(timezone.utc).date().isoformat(),
         due_date=quotation.expiry_date,
         notes=quotation.notes,
@@ -217,7 +222,12 @@ async def convert_quotation(quotation_id: int, user: user_dependency, db: db_dep
     quotation.updated_at = timestamp
     db.commit()
     db.refresh(invoice)
-    return {"message": "Quotation converted to invoice", "id": invoice.id, "print_url": f"/invoices/{invoice.id}/print"}
+    return {
+        "message": "Quotation converted to invoice",
+        "id": invoice.id,
+        "document_number": invoice.document_number,
+        "print_url": f"/invoices/{invoice.id}/print",
+    }
 
 
 def _render_document(request, user, db, model, document_id, document_type):
@@ -258,7 +268,10 @@ def _render_document(request, user, db, model, document_id, document_type):
             else total
         )
         row_customer = customers_by_id.get(row.customer_id)
-        reference = _metadata_value(row.document_number) or f"{document_type.title()} #{row.id}"
+        prefix = "INV" if document_type == "invoice" else "QT"
+        reference = display_document_number(
+            _metadata_value(row.document_number), prefix, row.created_at, row.id
+        )
         issue_date = _document_issue_date(row)
         detail = f"{reference} - {issue_date}" if issue_date else reference
         preview_items.append({
@@ -285,9 +298,11 @@ def _render_document(request, user, db, model, document_id, document_type):
         "user": user,
         "document": document,
         "document_type": document_type,
-        "display_document_number": (
-            _metadata_value(document.document_number)
-            or f"{document_type.title()} #{document.id}"
+        "display_document_number": display_document_number(
+            _metadata_value(document.document_number),
+            "INV" if document_type == "invoice" else "QT",
+            document.created_at,
+            document.id,
         ),
         "display_issue_date": _document_issue_date(document),
         "display_deadline": _metadata_value(

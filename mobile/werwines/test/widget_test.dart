@@ -84,6 +84,8 @@ void main() {
               'recent_sales': [
                 {
                   'invoice_id': 44,
+                  'invoice_number': 'INV-2026-00044',
+                  'receipt_number': 'RCT-2026-00044',
                   'created_at': '2026-11-18T10:00:00+02:00',
                   'customer_name': 'Walk-in customer',
                   'status': 'paid',
@@ -104,6 +106,8 @@ void main() {
               'sales': [
                 {
                   'invoice_id': 44,
+                  'invoice_number': 'INV-2026-00044',
+                  'receipt_number': 'RCT-2026-00044',
                   'created_at': '2026-11-18T10:00:00+02:00',
                   'customer_name': 'Walk-in customer',
                   'status': 'paid',
@@ -122,6 +126,8 @@ void main() {
           return http.Response(
             jsonEncode({
               'invoice_id': 44,
+              'invoice_number': 'INV-2026-00044',
+              'receipt_number': 'RCT-2026-00044',
               'status': 'paid',
               'created_at': '2026-11-18T10:00:00+02:00',
               'customer_name': 'Walk-in customer',
@@ -193,6 +199,8 @@ void main() {
           return http.Response(
             jsonEncode({
               'invoice_id': 44,
+              'invoice_number': 'INV-2026-00044',
+              'receipt_number': 'RCT-2026-00044',
               'total_amount': '10.00',
               'amount_paid': '10.00',
               'change_amount': '10.00',
@@ -249,7 +257,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('nav-receipts')));
     await tester.pumpAndSettle();
-    expect(find.text('Sale #44'), findsOneWidget);
+    expect(find.text('Sale #RCT-2026-00044'), findsOneWidget);
     expect(find.byKey(const ValueKey('export-sales-report')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('sales-period-filter')));
     await tester.pumpAndSettle();
@@ -258,10 +266,10 @@ void main() {
     expect(salesHistoryQueries, hasLength(2));
     expect(salesHistoryQueries.last, containsPair('date_from', isNotEmpty));
     expect(salesHistoryQueries.last, containsPair('date_to', isNotEmpty));
-    expect(find.text('Sale #44'), findsOneWidget);
+    expect(find.text('Sale #RCT-2026-00044'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('sale-44')));
     await tester.pumpAndSettle();
-    expect(find.text('Receipt #44'), findsOneWidget);
+    expect(find.text('Receipt #RCT-2026-00044'), findsOneWidget);
     expect(find.text('Cabernet'), findsOneWidget);
     expect(find.byTooltip('Share receipt'), findsOneWidget);
     expect(find.byTooltip('Print receipt'), findsOneWidget);

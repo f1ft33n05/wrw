@@ -301,6 +301,7 @@ class Invoices(Base):
     customer_id = Column(Integer)
     event_id = Column(Integer, index=True)
     document_number = Column(String, unique=True, index=True)
+    receipt_number = Column(String, unique=True, index=True)
     issue_date = Column(String)
     due_date = Column(String)
     notes = Column(String)
@@ -315,6 +316,14 @@ class Invoices(Base):
     status = Column(String)  # e.g., "unpaid", "paid", "overdue"
     created_at = Column(String)
     updated_at = Column(String)
+
+
+class DocumentSequence(Base):
+    __tablename__ = "document_sequences"
+
+    prefix = Column(String, primary_key=True)
+    year = Column(Integer, primary_key=True)
+    last_value = Column(Integer, nullable=False)
 
 
 class Payments(Base):

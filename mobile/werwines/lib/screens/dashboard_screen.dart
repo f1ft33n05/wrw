@@ -256,7 +256,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               vertical: 0,
                             ),
                             title: Text(
-                              'Invoice #${sale.invoiceId}',
+                              'Invoice #${sale.invoiceNumber}',
                               style: const TextStyle(
                                 fontSize: 14.0,
                                 fontWeight: FontWeight.bold,

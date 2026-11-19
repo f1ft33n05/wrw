@@ -17,7 +17,7 @@ user_dependency = Annotated[dict, Depends(get_current_user)]
 SETTINGS_ACCESS = Depends(RoleChecker(Role.admin, module="settings"))
 
 DEFAULTS = {
-    "receipt_prefix": "RCPT",
+    "receipt_prefix": "RCT",
     "quotation_prefix": "QT",
     "invoice_prefix": "INV",
     "document_layout": "standard",
@@ -28,7 +28,11 @@ DEFAULTS = {
 def get_settings(db):
     values = db.query(SystemSetting).all()
     settings = {setting.key: setting.value for setting in values}
-    return {key: settings.get(key, value) for key, value in DEFAULTS.items()}
+    fixed_prefixes = {"receipt_prefix", "quotation_prefix", "invoice_prefix"}
+    return {
+        key: value if key in fixed_prefixes else settings.get(key, value)
+        for key, value in DEFAULTS.items()
+    }
 
 
 @router.get("", response_class=HTMLResponse, dependencies=[SETTINGS_ACCESS])
@@ -41,16 +45,10 @@ async def settings_page(request: Request, user: user_dependency, db: db_dependen
 @router.post("/", dependencies=[SETTINGS_ACCESS])
 async def update_settings(
     db: db_dependency,
-    receipt_prefix: str = Form(...),
-    quotation_prefix: str = Form(...),
-    invoice_prefix: str = Form(...),
     document_layout: str = Form(...),
     document_footer: str = Form(default=""),
 ):
     values = {
-        "receipt_prefix": receipt_prefix.strip().upper(),
-        "quotation_prefix": quotation_prefix.strip().upper(),
-        "invoice_prefix": invoice_prefix.strip().upper(),
         "document_layout": document_layout.strip(),
         "document_footer": document_footer.strip(),
     }

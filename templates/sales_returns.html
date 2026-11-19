@@ -11,14 +11,14 @@
         <option value="">Select a sale</option>
         {% for invoice in invoices %}
         <option value="{{ invoice.id }}" {% if selected_invoice and selected_invoice.id == invoice.id %}selected{% endif %}>
-          {{ invoice.document_number or ("Sale #" ~ invoice.id) }} · {{ invoice.created_at }} · MWK {{ invoice.total_price }}
+          {{ receipt_numbers.get(invoice.id) }} · {{ invoice.created_at }} · MWK {{ invoice.total_price }}
         </option>
         {% endfor %}
       </select>
 
       {% if selected_invoice %}
       <form id="sale-return-form" data-invoice-id="{{ selected_invoice.id }}">
-        <h2>Sale #{{ selected_invoice.id }}</h2>
+        <h2>Sale #{{ receipt_numbers.get(selected_invoice.id) }}</h2>
         <div class="table-scroll-container">
           <table>
             <thead>

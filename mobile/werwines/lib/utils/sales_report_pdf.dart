@@ -135,26 +135,47 @@ pw.Widget _itemRow(SalesReportItem item) => pw.Padding(
   child: pw.Column(
     crossAxisAlignment: pw.CrossAxisAlignment.stretch,
     children: [
-      pw.Text(
-        item.name,
-        style: pw.TextStyle(fontSize: 8,),
-      ),
+      pw.Text(item.name, style: const pw.TextStyle(fontSize: 8)),
       pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(
-            '${_formatQuantity(item.quantity)} ${item.priceType}',
-            style: const pw.TextStyle(fontSize: 6),
+          pw.Expanded(
+            child: pw.Text(
+              _quantityBreakdown(item.quantitiesByType),
+              style: const pw.TextStyle(fontSize: 6),
+            ),
           ),
           pw.Text(
             formatMoney(item.totalAmount),
-            style: const pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+            style: const pw.TextStyle(
+              fontSize: 8,
+              fontWeight: pw.FontWeight.bold,
+            ),
           ),
         ],
       ),
     ],
   ),
 );
+
+String _quantityBreakdown(Map<String, double> quantitiesByType) {
+  final quantities =
+      quantitiesByType.entries.where((entry) => entry.value > 0).toList()
+        ..sort((left, right) {
+          const order = {'retail': 0, 'wholesale': 1};
+          final leftOrder = order[left.key.toLowerCase()] ?? 2;
+          final rightOrder = order[right.key.toLowerCase()] ?? 2;
+          return leftOrder == rightOrder
+              ? left.key.compareTo(right.key)
+              : leftOrder.compareTo(rightOrder);
+        });
+  if (quantities.isEmpty) return '0';
+  return quantities
+      .map(
+        (entry) => '${_formatQuantity(entry.value)} ${_titleCase(entry.key)}',
+      )
+      .join(', ');
+}
 
 String _formatQuantity(double quantity) =>
     quantity == quantity.truncateToDouble()
@@ -166,3 +187,12 @@ String _formatTimestamp(DateTime date) =>
     '${date.month.toString().padLeft(2, '0')}/${date.year}, '
     '${date.hour.toString().padLeft(2, '0')}:'
     '${date.minute.toString().padLeft(2, '0')}';
+
+String _titleCase(String value) => value
+    .split(RegExp(r'\s+'))
+    .map(
+      (word) => word.isEmpty
+          ? word
+          : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}',
+    )
+    .join(' ');

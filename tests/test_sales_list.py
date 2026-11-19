@@ -114,6 +114,8 @@ def test_sales_history_is_paginated_and_groups_invoice_lines(db):
 
     assert first_page["sales"] == [{
         "invoice_id": newer.id,
+        "invoice_number": f"INV-2026-{newer.id:05d}",
+        "receipt_number": f"RCT-2026-{newer.id:05d}",
         "created_at": "2026-11-18T12:00:00+02:00",
         "customer_name": "Walk-in customer",
         "status": "partially_paid",

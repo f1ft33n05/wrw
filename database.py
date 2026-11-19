@@ -54,6 +54,7 @@ db_dependency = Annotated[Session, Depends(get_db)]
 def ensure_sales_columns(database_engine: Engine) -> None:
     document_columns = {
         "document_number": "VARCHAR",
+        "receipt_number": "VARCHAR",
         "issue_date": "VARCHAR",
         "due_date": "VARCHAR",
         "expiry_date": "VARCHAR",
@@ -70,13 +71,23 @@ def ensure_sales_columns(database_engine: Engine) -> None:
         if inspect(database_engine).has_table(table):
             existing = {column["name"] for column in inspect(database_engine).get_columns(table)}
             applicable = dict(document_columns)
-            if table != "quotations":
+            if table == "quotations":
+                applicable.pop("receipt_number")
+            else:
                 applicable.pop("expiry_date")
             missing = {name: sql_type for name, sql_type in applicable.items() if name not in existing}
             if missing:
                 with database_engine.begin() as connection:
                     for name, sql_type in missing.items():
                         connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {sql_type}"))
+    if inspect(database_engine).has_table("invoices"):
+        with database_engine.begin() as connection:
+            connection.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "ix_invoices_receipt_number ON invoices (receipt_number)"
+                )
+            )
     inspector = inspect(database_engine)
     if inspector.has_table("sales_txns"):
         columns = {column["name"] for column in inspector.get_columns("sales_txns")}

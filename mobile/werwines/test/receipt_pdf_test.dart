@@ -10,6 +10,8 @@ void main() {
   test('builds a PDF from the backend receipt data', () async {
     const receipt = SaleReceipt(
       invoiceId: 42,
+      invoiceNumber: 'INV-2026-00042',
+      receiptNumber: 'RCT-2026-00042',
       status: 'paid',
       createdAt: '2026-11-18T10:00:00+02:00',
       customerName: 'Walk-in customer',
@@ -74,8 +76,7 @@ void main() {
         itemsSold: [
           SalesReportItem(
             name: 'Pinotage',
-            priceType: 'Retail',
-            quantity: 2,
+            quantitiesByType: {'Retail': 3, 'Wholesale': 16},
             totalAmount: 140,
           ),
         ],

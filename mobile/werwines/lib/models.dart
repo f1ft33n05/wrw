@@ -108,6 +108,8 @@ class SaleQuote {
 class SaleResult {
   const SaleResult({
     required this.invoiceId,
+    required this.invoiceNumber,
+    required this.receiptNumber,
     required this.totalAmount,
     required this.amountPaid,
     required this.changeAmount,
@@ -115,14 +117,19 @@ class SaleResult {
   });
 
   final int invoiceId;
+  final String invoiceNumber;
+  final String receiptNumber;
   final double totalAmount;
   final double amountPaid;
   final double changeAmount;
   final double balanceDue;
 
   factory SaleResult.fromJson(Map<String, dynamic> json) {
+    final invoiceId = json['invoice_id'] as int;
     return SaleResult(
-      invoiceId: json['invoice_id'] as int,
+      invoiceId: invoiceId,
+      invoiceNumber: _documentNumber(json, 'invoice_number', 'INV', invoiceId),
+      receiptNumber: _documentNumber(json, 'receipt_number', 'RCT', invoiceId),
       totalAmount: double.parse(json['total_amount'].toString()),
       amountPaid: double.parse(json['amount_paid'].toString()),
       changeAmount: double.parse(json['change_amount'].toString()),
@@ -189,6 +196,8 @@ class DashboardSummary {
 class SaleHistoryEntry {
   const SaleHistoryEntry({
     required this.invoiceId,
+    required this.invoiceNumber,
+    required this.receiptNumber,
     required this.createdAt,
     required this.customerName,
     required this.status,
@@ -200,6 +209,8 @@ class SaleHistoryEntry {
   });
 
   final int invoiceId;
+  final String invoiceNumber;
+  final String receiptNumber;
   final String? createdAt;
   final String customerName;
   final String status;
@@ -210,9 +221,25 @@ class SaleHistoryEntry {
   final List<String> paymentMethods;
 
   factory SaleHistoryEntry.fromJson(Map<String, dynamic> json) {
+    final invoiceId = _requiredInt(json, 'invoice_id');
+    final createdAt = json['created_at']?.toString();
     return SaleHistoryEntry(
-      invoiceId: _requiredInt(json, 'invoice_id'),
-      createdAt: json['created_at']?.toString(),
+      invoiceId: invoiceId,
+      invoiceNumber: _documentNumber(
+        json,
+        'invoice_number',
+        'INV',
+        invoiceId,
+        createdAt: createdAt,
+      ),
+      receiptNumber: _documentNumber(
+        json,
+        'receipt_number',
+        'RCT',
+        invoiceId,
+        createdAt: createdAt,
+      ),
+      createdAt: createdAt,
       customerName: _requiredString(json, 'customer_name'),
       status: _requiredString(json, 'status'),
       totalAmount: _requiredNumber(json, 'total_amount'),
@@ -352,28 +379,38 @@ class SalesReportPaymentMethod {
 class SalesReportItem {
   const SalesReportItem({
     required this.name,
-    required this.priceType,
-    required this.quantity,
+    required this.quantitiesByType,
     required this.totalAmount,
   });
 
   final String name;
-  final String priceType;
-  final double quantity;
+  final Map<String, double> quantitiesByType;
   final double totalAmount;
 
-  factory SalesReportItem.fromJson(Map<String, dynamic> json) =>
-      SalesReportItem(
-        name: _requiredString(json, 'item_name'),
-        priceType: _requiredString(json, 'price_type'),
-        quantity: _requiredNumber(json, 'quantity'),
-        totalAmount: _requiredNumber(json, 'total_amount'),
-      );
+  factory SalesReportItem.fromJson(Map<String, dynamic> json) {
+    final quantitiesByType = json['quantities_by_type'];
+    if (quantitiesByType is! Map) {
+      throw const FormatException('Invalid sales report item quantities.');
+    }
+    return SalesReportItem(
+      name: _requiredString(json, 'item_name'),
+      quantitiesByType: quantitiesByType.map((type, quantity) {
+        final parsed = double.tryParse(quantity.toString());
+        if (parsed == null || !parsed.isFinite) {
+          throw const FormatException('Invalid sales report item quantity.');
+        }
+        return MapEntry(type.toString(), parsed);
+      }),
+      totalAmount: _requiredNumber(json, 'total_amount'),
+    );
+  }
 }
 
 class SaleReceipt {
   const SaleReceipt({
     required this.invoiceId,
+    required this.invoiceNumber,
+    required this.receiptNumber,
     required this.status,
     required this.createdAt,
     required this.customerName,
@@ -390,6 +427,8 @@ class SaleReceipt {
   });
 
   final int invoiceId;
+  final String invoiceNumber;
+  final String receiptNumber;
   final String status;
   final String? createdAt;
   final String customerName;
@@ -405,10 +444,26 @@ class SaleReceipt {
   final double changeAmount;
 
   factory SaleReceipt.fromJson(Map<String, dynamic> json) {
+    final invoiceId = _requiredInt(json, 'invoice_id');
+    final createdAt = json['created_at']?.toString();
     return SaleReceipt(
-      invoiceId: _requiredInt(json, 'invoice_id'),
+      invoiceId: invoiceId,
+      invoiceNumber: _documentNumber(
+        json,
+        'invoice_number',
+        'INV',
+        invoiceId,
+        createdAt: createdAt,
+      ),
+      receiptNumber: _documentNumber(
+        json,
+        'receipt_number',
+        'RCT',
+        invoiceId,
+        createdAt: createdAt,
+      ),
       status: _requiredString(json, 'status'),
-      createdAt: json['created_at']?.toString(),
+      createdAt: createdAt,
       customerName: _requiredString(json, 'customer_name'),
       eventName: json['event_name']?.toString(),
       cashierName: json['cashier_name']?.toString(),
@@ -532,4 +587,17 @@ double _requiredNumber(Map<String, dynamic> json, String key) {
   final parsed = value is num ? value.toDouble() : double.tryParse('$value');
   if (parsed != null && parsed.isFinite) return parsed;
   throw FormatException('Invalid item field: $key');
+}
+
+String _documentNumber(
+  Map<String, dynamic> json,
+  String key,
+  String prefix,
+  int recordId, {
+  String? createdAt,
+}) {
+  final number = json[key]?.toString();
+  if (number != null && number.isNotEmpty) return number;
+  final year = DateTime.tryParse(createdAt ?? '')?.year ?? DateTime.now().year;
+  return '$prefix-$year-${recordId.toString().padLeft(5, '0')}';
 }

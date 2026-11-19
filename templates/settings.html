@@ -11,11 +11,7 @@
       <article>
         <form method="post" action="/settings">
           <h2>Document numbering</h2>
-          <div class="grid">
-            <label>Receipt prefix<input name="receipt_prefix" value="{{ settings.receipt_prefix }}" maxlength="20" required></label>
-            <label>Quotation prefix<input name="quotation_prefix" value="{{ settings.quotation_prefix }}" maxlength="20" required></label>
-            <label>Invoice prefix<input name="invoice_prefix" value="{{ settings.invoice_prefix }}" maxlength="20" required></label>
-          </div>
+          <p>Receipts: RCT-YYYY-00000 · Invoices: INV-YYYY-00000 · Quotes: QT-YYYY-00000</p>
           <h2>Document layout</h2>
           <label>Layout
             <select name="document_layout">

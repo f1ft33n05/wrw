@@ -1,4 +1,5 @@
 import asyncio
+import json
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 
@@ -214,13 +215,19 @@ def test_mobile_dashboard_returns_local_day_totals_and_ten_recent_sales(db):
 
 
 def test_mobile_sales_report_filters_period_and_groups_payments_and_items(db):
-    item = Item(name="Pinotage")
+    item = Item(name="Pinotage", wholesale_threshold="8")
     db.add(item)
     db.flush()
     invoice = Invoices(
         status="paid",
         total_price="140.00",
         tax_amount="20.00",
+        items=json.dumps([{
+            "item_id": item.id,
+            "quantity": "19",
+            "retail_quantity": "3",
+            "wholesale_quantity": "16",
+        }]),
         created_at="2026-11-18T10:00:00+02:00",
     )
     outside_period = Invoices(
@@ -234,16 +241,9 @@ def test_mobile_sales_report_filters_period_and_groups_payments_and_items(db):
         SalesTxn(
             invoice_id=invoice.id,
             item_id=item.id,
-            quantity="2",
-            price_type="retail",
-            total_price="100.00",
-        ),
-        SalesTxn(
-            invoice_id=invoice.id,
-            item_id=item.id,
-            quantity="1",
-            price_type="wholesale",
-            total_price="40.00",
+            quantity="19",
+            price_type="mixed",
+            total_price="140.00",
         ),
         SalesTxn(invoice_id=outside_period.id, item_id=item.id, quantity="1"),
         Payments(
@@ -279,15 +279,8 @@ def test_mobile_sales_report_filters_period_and_groups_payments_and_items(db):
     assert report["items_sold"] == [
         {
             "item_name": "Pinotage",
-            "price_type": "Retail",
-            "quantity": "2",
-            "total_amount": "100.00",
-        },
-        {
-            "item_name": "Pinotage",
-            "price_type": "Wholesale",
-            "quantity": "1",
-            "total_amount": "40.00",
+            "quantities_by_type": {"Retail": "3", "Wholesale": "16"},
+            "total_amount": "140.00",
         },
     ]
     history = asyncio.run(sales_history(
@@ -298,6 +291,8 @@ def test_mobile_sales_report_filters_period_and_groups_payments_and_items(db):
         date_to=date(2026, 11, 18),
     ))
     assert [sale["invoice_id"] for sale in history["sales"]] == [invoice.id]
+    assert history["sales"][0]["invoice_number"].startswith("INV-2026-")
+    assert history["sales"][0]["receipt_number"].startswith("RCT-2026-")
 
 
 def test_mobile_sales_report_rejects_reversed_period(db):

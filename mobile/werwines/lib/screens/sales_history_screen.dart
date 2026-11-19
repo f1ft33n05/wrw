@@ -343,7 +343,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
             child: ListTile(
               key: ValueKey('sale-${sale.invoiceId}'),
               title: Text(
-                'Sale #${sale.invoiceId}',
+                'Sale #${sale.receiptNumber}',
                 style: Theme.of(context).textTheme.titleMedium
                     ?.copyWith(fontSize: 14, fontWeight: FontWeight.bold),
               ),
@@ -469,8 +469,8 @@ class _SaleReceiptScreenState extends State<SaleReceiptScreen> {
       );
       await Printing.sharePdf(
         bytes: bytes,
-        filename: 'receipt-${receipt.invoiceId}.pdf',
-        subject: 'Receipt #${receipt.invoiceId}',
+        filename: 'receipt-${receipt.receiptNumber}.pdf',
+        subject: 'Receipt #${receipt.receiptNumber}',
       );
     });
   }
@@ -478,7 +478,7 @@ class _SaleReceiptScreenState extends State<SaleReceiptScreen> {
   Future<void> _printReceipt(SaleReceipt receipt) async {
     await _runReceiptAction('print', () async {
       await Printing.layoutPdf(
-        name: 'Receipt #${receipt.invoiceId}',
+        name: 'Receipt #${receipt.receiptNumber}',
         format: thermalReceiptPageFormat(receipt),
         onLayout: (_) => buildReceiptPdf(
           receipt,
@@ -511,7 +511,7 @@ class _SaleReceiptScreenState extends State<SaleReceiptScreen> {
     final receipt = _receipt;
     return Scaffold(
       appBar: AppBar(
-        title: Text('Receipt #${widget.invoiceId}'),
+        title: Text('Receipt #${receipt?.receiptNumber ?? widget.invoiceId}'),
         actions: [
           IconButton(
             tooltip: 'Share receipt',
@@ -555,7 +555,7 @@ class _SaleReceiptScreenState extends State<SaleReceiptScreen> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           Text(
-            'Sale #${receipt.invoiceId}',
+            'Sale #${receipt.receiptNumber}',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),
